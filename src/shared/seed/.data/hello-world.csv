@@ -1,0 +1,6 @@
+groupName,english,russian,description
+Hello World,code,код,Instructions written in a programming language
+Hello World,function,функция,A block of code that performs a specific task
+Hello World,variable,переменная,A storage location with an associated name that contains data
+Hello World,loop,цикл,A sequence of instructions that repeats until a condition is met
+Hello World,debug,отладка,The process of finding and fixing errors in code
