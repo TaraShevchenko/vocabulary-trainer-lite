@@ -5,6 +5,8 @@ import * as path from "path";
 
 const prisma = new PrismaClient();
 
+// Функция ensureSystemUser больше не нужна, так как группы слов теперь могут быть глобальными
+
 interface WordData {
   groupName: string;
   english: string;
@@ -94,7 +96,7 @@ export async function seedWordsAndGroups() {
           create: {
             name: groupName,
             description: groupDescription,
-            userId: "system", // Используем системный ID для глобальных групп
+            isGlobal: true, // Создаем глобальную группу
           },
           update: {
             description: groupDescription,

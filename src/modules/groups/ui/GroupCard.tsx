@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Progress } from "@/shared/ui/progress";
 import { Badge } from "@/shared/ui/badge";
-import { BookOpen, CheckCircle } from "lucide-react";
+import { Button } from "@/shared/ui/button";
+import { BookOpen, CheckCircle, Star } from "lucide-react";
 
 interface GroupCardProps {
   id: string;
@@ -13,6 +14,8 @@ interface GroupCardProps {
   totalWords: number;
   completedWords: number;
   averageProgress: number;
+  isFavorite?: boolean;
+  onToggleFavorite?: (groupId: string) => void;
 }
 
 export function GroupCard({
@@ -22,7 +25,15 @@ export function GroupCard({
   totalWords,
   completedWords,
   averageProgress,
+  isFavorite = false,
+  onToggleFavorite,
 }: GroupCardProps) {
+  
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onToggleFavorite?.(id);
+  };
   const progressColor = averageProgress >= 80 
     ? "bg-green-500" 
     : averageProgress >= 50 
@@ -44,9 +55,27 @@ export function GroupCard({
                 </CardDescription>
               )}
             </div>
-            <Badge variant="secondary" className="ml-2">
-              {averageProgress}%
-            </Badge>
+            <div className="flex items-center gap-2 ml-2">
+              <Badge variant="secondary">
+                {averageProgress}%
+              </Badge>
+              {onToggleFavorite && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  onClick={handleFavoriteClick}
+                >
+                  <Star 
+                    className={`h-4 w-4 transition-colors ${
+                      isFavorite 
+                        ? 'fill-yellow-400 text-yellow-400' 
+                        : 'text-gray-400 hover:text-yellow-400'
+                    }`}
+                  />
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         

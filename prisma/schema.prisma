@@ -34,7 +34,8 @@ model User {
     updatedAt DateTime @updatedAt
 
     // Связи
-    favoriteGroups WordGroup[]
+    createdGroups  WordGroup[] @relation("CreatedGroups")
+    favoriteGroups WordGroup[] @relation("FavoriteGroups")
     progress       Progress[]
 
     @@index([email])
@@ -50,18 +51,23 @@ model WordGroup {
     id          String  @id @default(cuid())
     name        String  @unique
     description String?
+    isGlobal    Boolean @default(true) // Глобальные группы доступны всем
 
+    // Опциональная связь с создателем (только для пользовательских групп)
+    createdBy   String?
+    creator     User?   @relation("CreatedGroups", fields: [createdBy], references: [id], onDelete: Cascade)
+    
     // Связи
-    userId String
-    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    words  Word[]
+    words           Word[]
+    favoritedByUsers User[] @relation("FavoriteGroups")
 
     // Метаданные
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
     @@index([name])
-    @@index([userId])
+    @@index([createdBy])
+    @@index([isGlobal])
     @@map("word_groups")
 }
 
@@ -103,8 +109,6 @@ model Word {
     groupId  String
     group    WordGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
     progress Progress[]
-
-
 
     // Метаданные
     createdAt DateTime @default(now())
