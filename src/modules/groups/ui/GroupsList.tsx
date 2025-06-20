@@ -66,28 +66,22 @@ export function GroupsList() {
         </div>
       </div>
 
-      {/* Statistics */}
       <Card
         className="bg-gradient-to-br from-[#5020A0] to-[#8040E0] text-white border-none shadow-lg rounded-xl p-6" // Увеличил padding
       >
         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center p-0">
           {" "}
-          {/* Убрал padding из CardContent */}
           <div className="flex flex-col items-center">
             <div className="text-6xl font-bold text-white">
               {groups.reduce((sum, group) => sum + group.totalWords, 0)}
             </div>{" "}
-            {/* Увеличил размер */}
             <div className="text-lg text-gray-200 mt-2">Total Words</div>{" "}
-            {/* Увеличил размер и добавил отступ */}
           </div>
           <div className="flex flex-col items-center">
             <div className="text-6xl font-bold text-white">
               {groups.reduce((sum, group) => sum + group.completedWords, 0)}
             </div>{" "}
-            {/* Увеличил размер, белый цвет */}
             <div className="text-lg text-gray-200 mt-2">Learned Words</div>{" "}
-            {/* Увеличил размер и добавил отступ */}
           </div>
           <div className="flex flex-col items-center">
             <div className="text-6xl font-bold text-white">
@@ -97,11 +91,9 @@ export function GroupsList() {
               )}
               %
             </div>{" "}
-            {/* Увеличил размер, белый цвет */}
             <div className="text-lg text-gray-200 mt-2">
               Average Progress
             </div>{" "}
-            {/* Увеличил размер и добавил отступ */}
           </div>
         </CardContent>
       </Card>
