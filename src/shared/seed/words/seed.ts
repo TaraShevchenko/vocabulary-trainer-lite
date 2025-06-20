@@ -103,9 +103,7 @@ export async function seedWordsAndGroups() {
           },
         });
         createdGroups++;
-        console.log(
-          `✅ Обработана группа: ${groupName}`,
-        );
+        console.log(`✅ Обработана группа: ${groupName}`);
 
         // Создаем или обновляем слова для группы
         for (const wordData of wordDataList) {

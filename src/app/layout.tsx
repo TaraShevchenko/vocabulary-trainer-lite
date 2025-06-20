@@ -1,6 +1,5 @@
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
-import { ruRU } from "@clerk/localizations";
 import {
   ClerkProvider,
   SignInButton,
@@ -33,7 +32,6 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ClerkProvider
-      localization={ruRU}
       afterSignOutUrl="/login"
       signInUrl="/login"
       signUpUrl="/register"
@@ -43,7 +41,7 @@ export default function RootLayout({
     >
       <html lang="en" className={`dark ${geist.variable}`}>
         <body className="flex min-h-screen flex-col">
-          <header className="container mx-auto px-4 py-8 flex justify-end">
+          <header className="container mx-auto px-4 py-8 flex justify-end gap-2">
             <SignedOut>
               <Button variant={"outline"} asChild>
                 <SignInButton>Sign In</SignInButton>
