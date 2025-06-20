@@ -1,0 +1,513 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    // NOTE: When using postgresql with Clerk authentication
+    // User data is managed by Clerk, we only store additional app-specific data
+    url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ПОЛЬЗОВАТЕЛИ (интеграция с Clerk)
+// ============================================================================
+
+model User {
+    id        String  @id // Clerk user ID
+    email     String  @unique
+    firstName String?
+    lastName  String?
+    name      String? // Computed field: firstName + lastName
+    imageUrl  String?
+    username  String? @unique
+
+    // Clerk metadata
+    clerkCreatedAt DateTime?
+    clerkUpdatedAt DateTime?
+
+    // App metadata
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Связи
+    ingredients    Ingredient[]
+    meals          Meal[]
+    quickMeals     QuickMeal[]
+    cookedMeals    CookedMeal[]
+    mealEntries    MealEntry[]
+    portionHistory PortionHistory[]
+    familyMembers  FamilyMember[]
+    ShoppingList   ShoppingList[]
+
+    @@index([email])
+    @@index([username])
+    @@map("users")
+}
+
+// ============================================================================
+// СЕМЕЙНЫЙ РЕЖИМ
+// ============================================================================
+
+model Family {
+    id        String   @id @default(cuid())
+    name      String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Связи
+    members      FamilyMember[]
+    ShoppingList ShoppingList[]
+
+    @@map("families")
+}
+
+model FamilyMember {
+    id       String @id @default(cuid())
+    familyId String
+    userId   String
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Связи
+    family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([familyId, userId]) // Пользователь может быть только один раз в семье
+    @@index([familyId])
+    @@index([userId])
+    @@map("family_members")
+}
+
+// ============================================================================
+// ИНГРЕДИЕНТЫ
+// ============================================================================
+
+model Ingredient {
+    id     String  @id @default(cuid())
+    userId String?
+    name   String
+
+    // Пищевая ценность на 100г
+    calories Float? @default(0)
+    protein  Float? @default(0)
+    carbs    Float? @default(0)
+    fat      Float? @default(0)
+
+    // Система единиц измерения
+    gramsPerPiece Float? // вес одной штуки в граммах (если поддерживает штуки)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Связи
+    user                  User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+    mealIngredients       MealIngredient[]
+    mealEntryIngredients  MealEntryIngredient[]
+    cookedMealIngredients CookedMealIngredient[]
+    portionHistory        PortionHistory[]
+    shoppingListItems     ShoppingListItem[]
+    packaging             IngredientPackaging[]
+
+    @@index([userId])
+    @@map("ingredients")
+}
+
+// ============================================================================
+// БЛЮДА (переименованные из Recipe)
+// ============================================================================
+
+model Meal {
+    id           String  @id @default(cuid())
+    name         String
+    userId       String?
+    description  String?
+    instructions String?
+
+    expectedYield Float? // ожидаемый выход в граммах
+    actualYield   Float? // фактический выход в граммах
+
+    prepTime        Int? // время подготовки в минутах
+    cookTime        Int? // время готовки в минутах
+    gramsPerServing Float? // размер одной порции в граммах
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Связи
+    user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+    mealIngredients MealIngredient[]
+    mealEntryMeals  MealEntryMeal[]
+    cookedMeals     CookedMeal[]
+    portionHistory  PortionHistory[]
+
+    @@index([userId])
+    @@map("meals")
+}
+
+// ============================================================================
+// СВЯЗЬ БЛЮД С ИНГРЕДИЕНТАМИ
+// ============================================================================
+
+model MealIngredient {
+    id           String          @id @default(cuid())
+    mealId       String
+    ingredientId String
+    amount       Float // размер порции
+    unit         MeasurementUnit // единица измерения
+
+    // Связи
+    meal       Meal       @relation(fields: [mealId], references: [id], onDelete: Cascade)
+    ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+    @@unique([mealId, ingredientId])
+    @@map("meal_ingredients")
+}
+
+// ============================================================================
+// БЫСТРЫЕ БЛЮДА
+// ============================================================================
+
+model QuickMeal {
+    id          String  @id @default(cuid())
+    name        String
+    userId      String?
+    description String?
+
+    // Пищевая ценность на 100г (рассчитывается или вводится вручную)
+    calories        Float? @default(0)
+    protein         Float? @default(0)
+    carbs           Float? @default(0)
+    fat             Float? @default(0)
+    gramsPerServing Float? // размер одной порции в граммах
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Связи
+    user                User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+    mealEntryQuickMeals MealEntryQuickMeal[]
+    portionHistory      PortionHistory[]
+
+    @@index([userId])
+    @@map("quick_meals")
+}
+
+// ============================================================================
+// ПРИГОТОВЛЕННЫЕ БЛЮДА (персональные блюда пользователей)
+// ============================================================================
+
+model CookedMeal {
+    id          String  @id @default(cuid())
+    userId      String // Обязательная привязка к пользователю
+    baseMealId  String? // Ссылка на исходный Meal (может быть null если создан с нуля)
+    name        String // Название (по умолчанию копируется из Meal)
+    description String? // Описание (может быть изменено)
+
+    // Статус для управления жизненным циклом
+    status CookedMealStatus @default(ACTIVE)
+
+    // Метаданные
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @updatedAt
+    archivedAt DateTime? // Дата архивирования
+
+    // Связи
+    user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    baseMeal              Meal?                  @relation(fields: [baseMealId], references: [id], onDelete: SetNull)
+    cookedMealIngredients CookedMealIngredient[]
+    mealEntryCookedMeals  MealEntryCookedMeal[]
+    portionHistory        PortionHistory[]
+
+    @@index([userId])
+    @@index([status])
+    @@index([baseMealId])
+    @@index([createdAt])
+    @@map("cooked_meals")
+}
+
+enum CookedMealStatus {
+    ACTIVE // Активное, доступно для использования
+    ARCHIVED // Архивировано, не показывается в основных списках
+
+    @@map("cooked_meal_statuses")
+}
+
+// ============================================================================
+// СВЯЗЬ ПРИГОТОВЛЕННЫХ БЛЮД С ИНГРЕДИЕНТАМИ
+// ============================================================================
+
+model CookedMealIngredient {
+    id           String          @id @default(cuid())
+    cookedMealId String
+    ingredientId String
+    amount       Float // Количество ингредиента
+    unit         MeasurementUnit // Единица измерения
+
+    // Связи
+    cookedMeal CookedMeal @relation(fields: [cookedMealId], references: [id], onDelete: Cascade)
+    ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+    @@unique([cookedMealId, ingredientId])
+    @@map("cooked_meal_ingredients")
+}
+
+// ============================================================================
+// ЗАПИСИ О ПРИЕМАХ ПИЩИ
+// ============================================================================
+
+model MealEntry {
+    id       String    @id @default(cuid())
+    userId   String
+    date     DateTime // Дата планирования (день, месяц, год)
+    mealTime DateTime? // Время выполнения: null = планируется, заполнено = выполнено
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Связи
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    // Связи many-to-many с ингредиентами, блюдами и быстрыми блюдами
+    mealEntryIngredients MealEntryIngredient[]
+    mealEntryMeals       MealEntryMeal[]
+    mealEntryQuickMeals  MealEntryQuickMeal[]
+    mealEntryCookedMeals MealEntryCookedMeal[]
+
+    @@index([userId])
+    @@index([date])
+    @@index([mealTime])
+    @@map("meal_entries")
+}
+
+// ============================================================================
+// СВЯЗИ ЗАПИСЕЙ О ПРИЕМАХ ПИЩИ С ИНГРЕДИЕНТАМИ
+// ============================================================================
+
+model MealEntryIngredient {
+    id               String @id @default(cuid())
+    mealEntryId      String
+    ingredientId     String
+    portionHistoryId String // связь с историей порций для указания количества
+
+    // Связи
+    mealEntry      MealEntry      @relation(fields: [mealEntryId], references: [id], onDelete: Cascade)
+    ingredient     Ingredient     @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+    portionHistory PortionHistory @relation(fields: [portionHistoryId], references: [id], onDelete: Cascade)
+
+    @@unique([mealEntryId, ingredientId])
+    @@map("meal_entry_ingredients")
+}
+
+// ============================================================================
+// СВЯЗИ ЗАПИСЕЙ О ПРИЕМАХ ПИЩИ С БЛЮДАМИ
+// ============================================================================
+
+model MealEntryMeal {
+    id               String @id @default(cuid())
+    mealEntryId      String
+    mealId           String
+    portionHistoryId String // связь с историей порций для указания количества
+
+    // Связи
+    mealEntry      MealEntry      @relation(fields: [mealEntryId], references: [id], onDelete: Cascade)
+    meal           Meal           @relation(fields: [mealId], references: [id], onDelete: Cascade)
+    portionHistory PortionHistory @relation(fields: [portionHistoryId], references: [id], onDelete: Cascade)
+
+    @@unique([mealEntryId, mealId])
+    @@map("meal_entry_meals")
+}
+
+// ============================================================================
+// СВЯЗИ ЗАПИСЕЙ О ПРИЕМАХ ПИЩИ С БЫСТРЫМИ БЛЮДАМИ
+// ============================================================================
+
+model MealEntryQuickMeal {
+    id               String @id @default(cuid())
+    mealEntryId      String
+    quickMealId      String
+    portionHistoryId String // связь с историей порций для указания количества
+
+    // Связи
+    mealEntry      MealEntry      @relation(fields: [mealEntryId], references: [id], onDelete: Cascade)
+    quickMeal      QuickMeal      @relation(fields: [quickMealId], references: [id], onDelete: Cascade)
+    portionHistory PortionHistory @relation(fields: [portionHistoryId], references: [id], onDelete: Cascade)
+
+    @@unique([mealEntryId, quickMealId])
+    @@map("meal_entry_quick_meals")
+}
+
+// ============================================================================
+// СВЯЗИ ЗАПИСЕЙ О ПРИЕМАХ ПИЩИ С ПРИГОТОВЛЕННЫМИ БЛЮДАМИ
+// ============================================================================
+
+model MealEntryCookedMeal {
+    id               String @id @default(cuid())
+    mealEntryId      String
+    cookedMealId     String
+    portionHistoryId String // Связь с историей порций для указания количества
+
+    // Связи
+    mealEntry      MealEntry      @relation(fields: [mealEntryId], references: [id], onDelete: Cascade)
+    cookedMeal     CookedMeal     @relation(fields: [cookedMealId], references: [id], onDelete: Cascade)
+    portionHistory PortionHistory @relation(fields: [portionHistoryId], references: [id], onDelete: Cascade)
+
+    @@unique([mealEntryId, cookedMealId])
+    @@map("meal_entry_cooked_meals")
+}
+
+// ============================================================================
+// ИСТОРИЯ ПОРЦИЙ (из units-and-portions-system.md)
+// ============================================================================
+
+model PortionHistory {
+    id     String @id @default(cuid())
+    userId String
+
+    itemId   String // ID элемента (ingredient, meal, quickMeal)
+    itemType ItemType // тип элемента
+
+    amount    Float // Размер порции
+    unit      MeasurementUnit // единица измерения
+    frequency Int // Частота использования
+    lastUsed  DateTime // Последнее использование
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Связи
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    // Обратные связи для моделей, которые ссылаются на PortionHistory
+    mealEntryIngredients MealEntryIngredient[]
+    mealEntryMeals       MealEntryMeal[]
+    mealEntryQuickMeals  MealEntryQuickMeal[]
+    mealEntryCookedMeals MealEntryCookedMeal[]
+    Ingredient           Ingredient?           @relation(fields: [ingredientId], references: [id])
+    ingredientId         String?
+    Meal                 Meal?                 @relation(fields: [mealId], references: [id])
+    mealId               String?
+    QuickMeal            QuickMeal?            @relation(fields: [quickMealId], references: [id])
+    quickMealId          String?
+    CookedMeal           CookedMeal?           @relation(fields: [cookedMealId], references: [id])
+    cookedMealId         String?
+
+    @@unique([userId, itemId, itemType]) // Уникальная комбинация для пользователя и элемента
+    @@index([userId])
+    @@index([itemId, itemType])
+    @@index([lastUsed])
+    @@index([frequency])
+    @@map("portion_history")
+}
+
+enum ItemType {
+    INGREDIENT
+    MEAL
+    QUICK_MEAL
+    COOKED_MEAL
+}
+
+enum MeasurementUnit {
+    GRAMS // г
+
+    PIECES // шт
+    SERVING // порции
+
+    @@map("measurement_units")
+}
+
+// ============================================================================
+// СПИСОК ПОКУПОК И МАГАЗИННЫЕ ФАСОВКИ
+// ============================================================================
+
+model ShoppingList {
+    id        String    @id @default(cuid())
+    ownerId   String // может быть либо userId либо familyId
+    ownerType OwnerType
+    name      String
+    dateFrom  DateTime
+    dateTo    DateTime
+    createdAt DateTime  @default(now())
+    updatedAt DateTime  @updatedAt
+
+    // Связи
+    items ShoppingListItem[]
+
+    // Условные связи (будут заполняться в зависимости от ownerType)
+    User     User?   @relation(fields: [userId], references: [id])
+    userId   String?
+    Family   Family? @relation(fields: [familyId], references: [id])
+    familyId String?
+
+    @@index([ownerId])
+    @@index([ownerType])
+    @@index([dateFrom, dateTo])
+    @@map("shopping_lists")
+}
+
+enum OwnerType {
+    USER
+    FAMILY
+
+    @@map("owner_types")
+}
+
+model ShoppingListItem {
+    id           String             @id @default(cuid())
+    listId       String
+    ingredientId String
+    totalGrams   Float
+    status       ShoppingItemStatus @default(MUST_BUY)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    // Связи
+    list       ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+    ingredient Ingredient   @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+    @@unique([listId, ingredientId]) // один ингредиент один раз в списке
+    @@index([listId])
+    @@index([status])
+    @@map("shopping_list_items")
+}
+
+model IngredientPackaging {
+    id           String     @id @default(cuid())
+    ingredientId String
+    ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+    // Информация о фасовке
+    packageName String // название фасовки (например, "Пачка 500г", "Банка 1л")
+    packageSize Float // размер упаковки
+    unit        MeasurementUnit // единица измерения
+
+    // Информация о магазине
+    storeName String? // название магазина (опционально)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("ingredient_packaging")
+}
+
+enum ShoppingItemStatus {
+    MUST_BUY // точно купить
+    CHECK_AVAILABILITY // проверить наличие
+    BOUGHT // уже куплено
+
+    @@map("shopping_item_statuses")
+}
+
+// ============================================================================
+// ИНДЕКСЫ И ОГРАНИЧЕНИЯ
+// ============================================================================
+
+// Дополнительные индексы для производительности
+// @@index([userId, date]) - для быстрого поиска записей пользователя по дате
+// @@index([mealType, date]) - для фильтрации по типу приема пищи
+// @@index([usedCount]) - для сортировки популярных порций
