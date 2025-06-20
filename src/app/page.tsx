@@ -1,13 +1,28 @@
-import type { Metadata } from "next";
+import { type Metadata } from "next";
+import { GroupsList } from "@/modules/groups";
 
 export const metadata: Metadata = {
-  title: "Дашборд",
+  title: "Dashboard - Vocabulary Trainer",
+  description: "Main page for learning English words",
 };
 
-export default async function HomePage() {
+export default function DashboardPage() {
   return (
-    <div className="flex flex-1 items-center justify-center gap-2">
-      Дашборд в процессе разработки 🔧
+    <div className="container mx-auto px-4 py-8">
+      <div className="space-y-8">
+        {/* Заголовок страницы */}
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
+            Vocabulary Trainer Lite
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Learn English words effectively with interactive exercises
+          </p>
+        </div>
+
+        {/* Список групп */}
+        <GroupsList />
+      </div>
     </div>
   );
 }

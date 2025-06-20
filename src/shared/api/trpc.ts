@@ -11,6 +11,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { auth } from "./auth";
 import { db } from "./db";
+import { ensureUserExists } from "./ensure-user";
 
 /**
  * 1. CONTEXT
@@ -90,13 +91,18 @@ export const publicProcedure = t.procedure;
  *
  * If you want a query or mutation to ONLY be accessible to logged in users, use this. It verifies
  * the session is valid and guarantees `ctx.session.user` is not null.
+ * Also ensures the user exists in the database.
  *
  * @see https://trpc.io/docs/procedures
  */
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+export const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
   if (!ctx.session?.user) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
+
+  // Ensure user exists in database
+  await ensureUserExists(ctx.session.user.id);
+
   return next({
     ctx: {
       // infers the `session` as non-nullable

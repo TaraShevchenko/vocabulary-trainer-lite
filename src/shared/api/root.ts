@@ -1,10 +1,15 @@
-import { createTRPCRouter, createCallerFactory } from "./trpc";
-import { userRouter } from "@/modules/user/model/router.user";
-import { ingredientRouter } from "@/modules/ingredient/model/router.ingredient";
+import { exercisesRouter } from "@/modules/exercises/model/router.exercises";
+import { groupsRouter } from "@/modules/groups/model/router.groups";
+import { createCallerFactory, createTRPCRouter } from "@/shared/api/trpc";
 
+/**
+ * This is the primary router for your server.
+ *
+ * All routers added in /api/routers should be manually added here.
+ */
 export const appRouter = createTRPCRouter({
-  user: userRouter,
-  ingredient: ingredientRouter,
+  groups: groupsRouter,
+  exercises: exercisesRouter,
 });
 
 // export type definition of API

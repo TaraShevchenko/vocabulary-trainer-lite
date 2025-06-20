@@ -20,6 +20,11 @@ async function clearUsersFromDatabase() {
       return { deleted: 0 };
     }
 
+    // Удаляем связанные данные перед удалением пользователей
+    console.log("🗑️ Удаляем записи прогресса пользователей...");
+    const deletedProgress = await prisma.progress.deleteMany({});
+    console.log(`✅ Удалено записей прогресса: ${deletedProgress.count}`);
+
     // Удаляем всех пользователей из локальной базы данных
     console.log("🗑️ Удаляем всех пользователей из PostgreSQL...");
     const deleteResult = await prisma.user.deleteMany({});
@@ -32,7 +37,10 @@ async function clearUsersFromDatabase() {
       "💡 Для восстановления данных запустите: npm run db:seed:users",
     );
 
-    return { deleted: deleteResult.count };
+    return { 
+      deletedProgress: deletedProgress.count,
+      deleted: deleteResult.count 
+    };
   } catch (error) {
     console.error("❌ Ошибка при очистке пользователей:", error);
     throw error;

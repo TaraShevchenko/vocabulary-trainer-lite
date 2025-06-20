@@ -10,14 +10,16 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
+import { Toaster } from "react-hot-toast";
 import { TRPCReactProvider } from "@/shared/api/client";
-import "@/shared/styles/globals.css";
 import { Button } from "@/shared/ui/button";
+import "./globals.css";
+
 // import { NavigationMenu } from "@/shared/ui/navigation-menu";
 
 export const metadata: Metadata = {
-  title: "Планировщик блюд",
-  description: "Планирование, учет, управление блюдами и меню в целом",
+  title: "Vocabulary Trainer Lite",
+  description: "Learn and manage English vocabulary effectively",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
@@ -41,18 +43,17 @@ export default function RootLayout({
     >
       <html lang="en" className={`dark ${geist.variable}`}>
         <body className="flex min-h-screen flex-col">
-          <header className="flex h-16 items-center justify-end gap-2 px-4 pb-2 pt-4">
+          <header className="container mx-auto px-4 py-8 flex justify-end">
             <SignedOut>
               <Button variant={"outline"} asChild>
-                <SignInButton>Войти</SignInButton>
+                <SignInButton>Sign In</SignInButton>
               </Button>
               <Button asChild>
-                <SignUpButton>Регистрация</SignUpButton>
+                <SignUpButton>Sign Up</SignUpButton>
               </Button>
             </SignedOut>
             <SignedIn>
-              <div className="flex w-full items-center justify-between">
-                {/* <NavigationMenu
+              {/* <NavigationMenu
                   items={[
                     {
                       title: "Дашборд",
@@ -60,11 +61,20 @@ export default function RootLayout({
                     },
                   ]}
                 /> */}
-                <UserButton />
-              </div>
+              <UserButton />
             </SignedIn>
           </header>
           <TRPCReactProvider>{children}</TRPCReactProvider>
+          <Toaster
+            position="bottom-center"
+            toastOptions={{
+              duration: 2000,
+              style: {
+                background: "#363636",
+                color: "#fff",
+              },
+            }}
+          />
         </body>
       </html>
     </ClerkProvider>
