@@ -1,7 +1,7 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { db } from "@/shared/api/db";
 import { createTRPCRouter, protectedProcedure } from "@/shared/api/trpc";
-import { TRPCError } from "@trpc/server";
 
 export const groupsRouter = createTRPCRouter({
   /**
@@ -20,16 +20,31 @@ export const groupsRouter = createTRPCRouter({
             },
           },
         },
+        favoritedByUsers: {
+          where: {
+            id: ctx.session.user.id,
+          },
+          select: {
+            id: true,
+          },
+        },
       },
-      orderBy: {
-        name: "asc",
-      },
+      orderBy: [
+        {
+          favoritedByUsers: {
+            _count: "desc",
+          },
+        },
+        {
+          name: "asc",
+        },
+      ],
     });
 
     // Вычисляем статистику для каждой группы на основе прогресса пользователя
     const groupsWithStats = groups.map((group) => {
       const totalWords = group.words.length;
-      
+
       // Получаем прогресс пользователя для каждого слова
       const wordsWithUserProgress = group.words.map((word) => {
         const userProgress = word.progress[0];
@@ -62,6 +77,7 @@ export const groupsRouter = createTRPCRouter({
         totalWords,
         completedWords,
         averageProgress,
+        isFavorite: group.favoritedByUsers.length > 0,
         createdAt: group.createdAt,
         updatedAt: group.updatedAt,
       };
@@ -69,6 +85,68 @@ export const groupsRouter = createTRPCRouter({
 
     return groupsWithStats;
   }),
+
+  /**
+   * Переключить статус избранного для группы
+   */
+  toggleFavorite: protectedProcedure
+    .input(z.object({ groupId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.session.user.id;
+      const { groupId } = input;
+
+      // Проверяем существует ли группа
+      const group = await db.wordGroup.findUnique({
+        where: { id: groupId },
+        include: {
+          favoritedByUsers: {
+            where: {
+              id: userId,
+            },
+          },
+        },
+      });
+
+      if (!group) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Группа не найдена",
+        });
+      }
+
+      const isFavorite = group.favoritedByUsers.length > 0;
+
+      if (isFavorite) {
+        // Удаляем из избранного
+        await db.wordGroup.update({
+          where: { id: groupId },
+          data: {
+            favoritedByUsers: {
+              disconnect: {
+                id: userId,
+              },
+            },
+          },
+        });
+      } else {
+        // Добавляем в избранное
+        await db.wordGroup.update({
+          where: { id: groupId },
+          data: {
+            favoritedByUsers: {
+              connect: {
+                id: userId,
+              },
+            },
+          },
+        });
+      }
+
+      return {
+        success: true,
+        isFavorite: !isFavorite,
+      };
+    }),
 
   /**
    * Получить информацию о конкретной группе
@@ -100,7 +178,7 @@ export const groupsRouter = createTRPCRouter({
 
       // Вычисляем статистику группы на основе прогресса пользователя
       const totalWords = group.words.length;
-      
+
       // Получаем прогресс пользователя для каждого слова
       const wordsWithUserProgress = group.words.map((word) => {
         const userProgress = word.progress[0];
