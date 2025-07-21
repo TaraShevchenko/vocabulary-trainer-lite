@@ -1,7 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { parse } from "csv-parse/sync";
+import { config } from "dotenv";
 import * as fs from "fs";
 import * as path from "path";
+
+// Load environment variables from .env file
+config();
 
 const prisma = new PrismaClient();
 
@@ -24,7 +28,7 @@ function parseWordsCSV(): WordData[] {
     "shared",
     "seed",
     ".data",
-    "vocabulary.csv",
+    "describing_people_during_lesson.csv",
   );
 
   if (!fs.existsSync(csvPath)) {
