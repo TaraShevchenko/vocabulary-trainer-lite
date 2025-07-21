@@ -1,5 +1,5 @@
 import { type Metadata } from "next";
-import { GroupsList } from "@/modules/groups";
+import { GroupsList, GroupStatisticsSlider } from "@/modules/groups";
 
 export const metadata: Metadata = {
   title: "Dashboard - Vocabulary Trainer",
@@ -10,7 +10,6 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="space-y-8">
-        {/* Заголовок страницы */}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
             Vocabulary Trainer Lite
@@ -20,8 +19,10 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Список групп */}
-        <GroupsList />
+        <div className="space-y-6">
+          <GroupStatisticsSlider />
+          <GroupsList />
+        </div>
       </div>
     </div>
   );

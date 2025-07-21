@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import {
@@ -12,6 +13,7 @@ import { dark } from "@clerk/themes";
 import { Toaster } from "react-hot-toast";
 import { TRPCReactProvider } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
+import { Skeleton } from "@/shared/ui/skeleton";
 import "./globals.css";
 
 // import { NavigationMenu } from "@/shared/ui/navigation-menu";
@@ -59,7 +61,10 @@ export default function RootLayout({
                     },
                   ]}
                 /> */}
-              <UserButton />
+
+              <UserButton
+                fallback={<Skeleton className="h-7 w-7 rounded-full" />}
+              />
             </SignedIn>
           </header>
           <TRPCReactProvider>{children}</TRPCReactProvider>
