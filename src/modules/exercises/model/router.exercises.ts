@@ -120,6 +120,52 @@ export const exercisesRouter = createTRPCRouter({
         },
       });
 
+      // Обновляем статистику
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Ищем существующую запись статистики за сегодня
+      const existingStats = await db.userStatistics.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          date: today,
+        },
+      });
+
+      const statsUpdate: { wordsAdded?: number; wordsLearned?: number } = {};
+
+      // Если пользователь начал изучать слово впервые (прогресс был 0, стал > 0)
+      if (currentScore === 0 && newScore > 0) {
+        statsUpdate.wordsAdded = (existingStats?.wordsAdded || 0) + 1;
+      }
+
+      // Если слово было выучено (достигло 100%)
+      if (newScore >= 100 && currentScore < 100) {
+        statsUpdate.wordsLearned = (existingStats?.wordsLearned || 0) + 1;
+      }
+
+      // Обновляем статистику только если есть изменения
+      if (Object.keys(statsUpdate).length > 0) {
+        if (existingStats) {
+          // Обновляем существующую запись
+          await db.userStatistics.update({
+            where: { id: existingStats.id },
+            data: statsUpdate,
+          });
+        } else {
+          // Создаем новую запись
+          await db.userStatistics.create({
+            data: {
+              userId: ctx.session.user.id,
+              date: today,
+              wordsAdded: statsUpdate.wordsAdded || 0,
+              wordsLearned: statsUpdate.wordsLearned || 0,
+              wordsRepeated: 0,
+            },
+          });
+        }
+      }
+
       return {
         wordId: input.wordId,
         previousProgress: currentScore,

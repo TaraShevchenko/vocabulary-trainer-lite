@@ -1,5 +1,6 @@
 import { exercisesRouter } from "@/modules/exercises/model/router.exercises";
 import { groupsRouter } from "@/modules/groups/model/router.groups";
+import { statisticsRouter } from "@/modules/statistics/model/router.statistics";
 import { createCallerFactory, createTRPCRouter } from "@/shared/api/trpc";
 
 /**
@@ -10,6 +11,7 @@ import { createCallerFactory, createTRPCRouter } from "@/shared/api/trpc";
 export const appRouter = createTRPCRouter({
   groups: groupsRouter,
   exercises: exercisesRouter,
+  statistics: statisticsRouter,
 });
 
 // export type definition of API

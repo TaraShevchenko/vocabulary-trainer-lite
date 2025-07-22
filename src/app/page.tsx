@@ -1,5 +1,6 @@
 import { type Metadata } from "next";
-import { GroupsList, GroupStatisticsSlider } from "@/modules/groups";
+import { GroupsList } from "@/modules/groups";
+import { StatisticsSlider } from "@/modules/statistics";
 
 export const metadata: Metadata = {
   title: "Dashboard - Vocabulary Trainer",
@@ -20,7 +21,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-6">
-          <GroupStatisticsSlider />
+          <StatisticsSlider />
           <GroupsList />
         </div>
       </div>

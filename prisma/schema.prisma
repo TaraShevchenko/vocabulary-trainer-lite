@@ -34,9 +34,10 @@ model User {
     updatedAt DateTime @updatedAt
 
     // Связи
-    createdGroups  WordGroup[] @relation("CreatedGroups")
-    favoriteGroups WordGroup[] @relation("FavoriteGroups")
+    createdGroups  WordGroup[]      @relation("CreatedGroups")
+    favoriteGroups WordGroup[]      @relation("FavoriteGroups")
     progress       Progress[]
+    statistics     UserStatistics[]
 
     @@index([email])
     @@index([username])
@@ -54,11 +55,11 @@ model WordGroup {
     isGlobal    Boolean @default(true) // Глобальные группы доступны всем
 
     // Опциональная связь с создателем (только для пользовательских групп)
-    createdBy   String?
-    creator     User?   @relation("CreatedGroups", fields: [createdBy], references: [id], onDelete: Cascade)
-    
+    createdBy String?
+    creator   User?   @relation("CreatedGroups", fields: [createdBy], references: [id], onDelete: Cascade)
+
     // Связи
-    words           Word[]
+    words            Word[]
     favoritedByUsers User[] @relation("FavoriteGroups")
 
     // Метаданные
@@ -93,6 +94,34 @@ model Progress {
     @@index([userId])
     @@index([wordId])
     @@map("progress")
+}
+
+// ============================================================================
+// СТАТИСТИКА ПОЛЬЗОВАТЕЛЕЙ
+// ============================================================================
+
+model UserStatistics {
+    id     String   @id @default(cuid())
+    userId String
+    date   DateTime @db.Date // Дата без времени (YYYY-MM-DD)
+
+    // Статистика за день
+    wordsAdded    Int @default(0) // Слова добавленные в этот день
+    wordsLearned  Int @default(0) // Слова выученные в этот день (достигли 100%)
+    wordsRepeated Int @default(0) // Слова повторенные в этот день (пока всегда 0)
+
+    // Связи
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    // Метаданные
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([userId, date]) // Одна запись статистики на пользователя на день
+    @@index([userId])
+    @@index([date])
+    @@index([userId, date])
+    @@map("user_statistics")
 }
 
 // ============================================================================

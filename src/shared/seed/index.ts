@@ -7,4 +7,10 @@ export { clearUsersFromDatabase } from "./users/clear";
 export { seedWordsAndGroups } from "./words/seed";
 export { clearWordsAndGroups } from "./words/clear";
 
+// Статистика
+export { clearUserStatistics } from "./statistics/clear";
+
+// Полный сброс базы данных
+export { resetDatabase } from "./reset";
+
 // Экспорт данных для использования в других частях приложения
