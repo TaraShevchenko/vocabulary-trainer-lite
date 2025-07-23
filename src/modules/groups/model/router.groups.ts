@@ -366,4 +366,104 @@ export const groupsRouter = createTRPCRouter({
         },
       };
     }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        name: z
+          .string()
+          .min(1, "Group name is required")
+          .max(100, "Group name is too long"),
+        description: z.string().optional(),
+        words: z
+          .array(
+            z.object({
+              english: z.string().min(1, "English word is required"),
+              russian: z.string().min(1, "Russian translation is required"),
+              description: z.string().optional().default(""),
+            }),
+          )
+          .min(1, "Add at least one word"),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const userId = ctx.session.user.id;
+      const { name, description, words } = input;
+
+      const existingGroup = await db.wordGroup.findUnique({
+        where: { name },
+      });
+
+      if (existingGroup) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "A group with this name already exists",
+        });
+      }
+
+      const group = await db.wordGroup.create({
+        data: {
+          name,
+          description,
+          isGlobal: false,
+          createdBy: userId,
+          words: {
+            create: words.map((word) => ({
+              english: word.english,
+              russian: word.russian,
+              description: word.description || "",
+            })),
+          },
+        },
+        include: {
+          words: true,
+        },
+      });
+
+      // Обновляем статистику пользователя
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Ищем существующую запись статистики за сегодня
+      const existingStats = await db.userStatistics.findFirst({
+        where: {
+          userId,
+          date: today,
+        },
+      });
+
+      // Количество добавленных слов
+      const wordsCount = words.length;
+
+      if (existingStats) {
+        // Обновляем существующую запись
+        await db.userStatistics.update({
+          where: { id: existingStats.id },
+          data: {
+            wordsAdded: existingStats.wordsAdded + wordsCount,
+          },
+        });
+      } else {
+        // Создаем новую запись
+        await db.userStatistics.create({
+          data: {
+            userId,
+            date: today,
+            wordsAdded: wordsCount,
+            wordsLearned: 0,
+            wordsRepeated: 0,
+          },
+        });
+      }
+
+      return {
+        success: true,
+        group: {
+          id: group.id,
+          name: group.name,
+          description: group.description,
+          totalWords: group.words.length,
+        },
+      };
+    }),
 });

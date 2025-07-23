@@ -20,26 +20,6 @@ export function StatisticsSlider() {
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isTransitioning) return;
-
-      switch (event.key) {
-        case "ArrowLeft":
-          event.preventDefault();
-          prevSlide();
-          break;
-        case "ArrowRight":
-          event.preventDefault();
-          nextSlide();
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [nextSlide, prevSlide, isTransitioning]);
-
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.targetTouches[0]?.clientX || 0;
   };

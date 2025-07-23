@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, X, Eye, EyeOff, BookCheck } from "lucide-react";
+import { Search, X, Eye, EyeOff, BookCheck, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/shared/api/client";
 import { useDebounce, useInfiniteScroll } from "@/shared/hooks";
@@ -16,6 +16,7 @@ import {
 } from "@/shared/ui/select";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { Spinner } from "@/shared/ui/spinner";
+import { AddGroupModal } from "./AddGroupModal";
 import { GroupCard } from "./GroupCard";
 
 enum SortOption {
@@ -116,7 +117,7 @@ export function GroupsList() {
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row gap-4 items-center">
+      <div className="flex flex-col sm:flex-row gap-2 items-center">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
           <Input
@@ -160,6 +161,15 @@ export function GroupsList() {
         >
           <BookCheck className="size-4" />
         </Button>
+
+        <AddGroupModal>
+          <Button
+            variant="default"
+            className="flex items-center gap-2 whitespace-nowrap"
+          >
+            <Plus className="size-4" />
+          </Button>
+        </AddGroupModal>
       </div>
 
       {isLoading && !isInitialLoading && (
