@@ -41,6 +41,7 @@ declare global {
 export class SpeechRecognitionService {
   private recognition: SpeechRecognition | null = null;
   private isSupported = false;
+  private currentSessionId: string | null = null;
 
   constructor() {
     this.checkSupport();
@@ -64,6 +65,10 @@ export class SpeechRecognitionService {
     return new SpeechRecognitionConstructor();
   }
 
+  private generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
   startListening(
     options: SpeechRecognitionOptions = {},
     onResult?: (result: SpeechRecognitionResult) => void,
@@ -73,6 +78,13 @@ export class SpeechRecognitionService {
         reject(new Error("Speech recognition not supported"));
         return;
       }
+
+      // Останавливаем предыдущее распознавание если оно есть
+      this.forceStop();
+
+      // Создаем новую сессию
+      const sessionId = this.generateSessionId();
+      this.currentSessionId = sessionId;
 
       this.recognition = this.createRecognition();
       if (!this.recognition) {
@@ -86,8 +98,15 @@ export class SpeechRecognitionService {
       this.recognition.maxAlternatives = options.maxAlternatives || 1;
 
       let lastResult: SpeechRecognitionResult | null = null;
+      let hasResolved = false;
 
       this.recognition.onresult = (event) => {
+        // Проверяем что это результат текущей сессии
+        if (this.currentSessionId !== sessionId || hasResolved) {
+          console.log("Ignoring stale speech recognition result");
+          return;
+        }
+
         const lastEventResult = event.results[event.results.length - 1];
         if (!lastEventResult?.[0]) return;
 
@@ -104,45 +123,82 @@ export class SpeechRecognitionService {
         lastResult = result;
 
         // Вызываем callback для промежуточных результатов
-        if (onResult) {
+        if (onResult && this.currentSessionId === sessionId) {
           onResult(result);
         }
 
         // Резолвим промис только для финальных результатов
         if (isFinal || !options.continuous) {
-          resolve(result);
+          if (!hasResolved && this.currentSessionId === sessionId) {
+            hasResolved = true;
+            resolve(result);
+          }
         }
       };
 
       this.recognition.onerror = (event) => {
-        reject(new Error(`Speech recognition error: ${event.error}`));
+        if (this.currentSessionId === sessionId && !hasResolved) {
+          hasResolved = true;
+          reject(new Error(`Speech recognition error: ${event.error}`));
+        }
       };
 
       this.recognition.onend = () => {
-        // Если есть последний результат и мы еще не резолвили промис
-        if (lastResult && !lastResult.isFinal) {
-          resolve(lastResult);
+        // Если это конец нашей сессии и мы еще не резолвили промис
+        if (this.currentSessionId === sessionId) {
+          if (lastResult && !lastResult.isFinal && !hasResolved) {
+            hasResolved = true;
+            resolve(lastResult);
+          }
+
+          // Очищаем ссылки только если это наша сессия
+          if (this.currentSessionId === sessionId) {
+            this.recognition = null;
+            this.currentSessionId = null;
+          }
         }
-        this.recognition = null;
       };
 
       try {
         this.recognition.start();
       } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
+        if (!hasResolved) {
+          hasResolved = true;
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
       }
     });
   }
 
   stopListening(): void {
     if (this.recognition) {
-      this.recognition.stop();
-      this.recognition = null;
+      try {
+        this.recognition.stop();
+      } catch (error) {
+        console.warn("Error stopping speech recognition:", error);
+      }
+    }
+  }
+
+  // Принудительная остановка с очисткой состояния
+  forceStop(): void {
+    if (this.recognition) {
+      try {
+        this.recognition.onresult = null;
+        this.recognition.onerror = null;
+        this.recognition.onend = null;
+        this.recognition.stop();
+      } catch (error) {
+        console.warn("Error force stopping speech recognition:", error);
+      } finally {
+        this.recognition = null;
+        this.currentSessionId = null;
+      }
     }
   }
 
   isListening(): boolean {
-    return this.recognition !== null;
+    return this.recognition !== null && this.currentSessionId !== null;
   }
 }
 
@@ -157,6 +213,10 @@ export const startListening = (
 
 export const stopListening = (): void => {
   speechRecognitionService.stopListening();
+};
+
+export const forceStopListening = (): void => {
+  speechRecognitionService.forceStop();
 };
 
 export const isSpeechRecognitionSupported = (): boolean => {

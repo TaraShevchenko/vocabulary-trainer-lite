@@ -199,8 +199,8 @@ export function AddGroupModal({ children }: AddGroupModalProps) {
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="mb-2">Add New Group</DialogTitle>
-          <div className="flex items-start justify-between">
-            <DialogDescription>
+          <div className="flex items-start justify-between gap-4">
+            <DialogDescription className="text-left max-w-sm">
               Create a new word group for learning. Add a title, description and
               list of words.
             </DialogDescription>

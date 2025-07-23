@@ -284,7 +284,7 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 relative">
-      <div className="absolute left-0 -top-16 flex items-center gap-2">
+      <div className="absolute left-2 -top-16 flex items-center gap-2 md:left-0">
         <Button
           variant="outline"
           onClick={handleBackToDashboard}

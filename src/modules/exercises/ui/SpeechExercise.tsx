@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { EyeOff, Mic, MicOff, RotateCcw, Volume2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/shared/ui/button";
@@ -9,6 +9,7 @@ import { cn } from "@/shared/utils/cn";
 import {
   startListening,
   stopListening,
+  forceStopListening,
   isSpeechRecognitionSupported,
   type SpeechRecognitionResult,
 } from "@/shared/utils/speechRecognition";
@@ -48,10 +49,17 @@ export function SpeechExercise({
   const [similarity, setSimilarity] = useState(0);
   const [hasInterimResults, setHasInterimResults] = useState(false);
 
+  // Ref для отслеживания текущего слова и предотвращения race conditions
+  const currentWordIdRef = useRef(word.id);
+  const isActiveRef = useRef(true);
+
   const targetWord = word.english;
 
-  useEffect(() => {
-    setSpeechSupported(isSpeechRecognitionSupported());
+  // Функция для безопасной очистки состояния
+  const resetState = useCallback(() => {
+    // Принудительно останавливаем распознавание
+    forceStopListening();
+
     setShowRussian(false);
     setHasAnswered(false);
     setIsCorrect(false);
@@ -61,30 +69,51 @@ export function SpeechExercise({
     setCanStartListening(false);
     setIsListening(false);
     setIsSpeaking(false);
+  }, []);
+
+  // Обновляем ref при смене слова
+  useEffect(() => {
+    currentWordIdRef.current = word.id;
+    isActiveRef.current = true;
+
+    return () => {
+      isActiveRef.current = false;
+    };
+  }, [word.id]);
+
+  useEffect(() => {
+    setSpeechSupported(isSpeechRecognitionSupported());
+    resetState();
 
     const autoSpeakDescription = async () => {
       if (!word.description || isSpeaking) return;
 
       try {
         setIsSpeaking(true);
-        // Используем стандартные настройки, которые автоматически адаптируются для iOS
         await speakText(word.description, { lang: "en-US" });
-        setCanStartListening(true);
+
+        // Проверяем что мы все еще на том же слове
+        if (currentWordIdRef.current === word.id && isActiveRef.current) {
+          setCanStartListening(true);
+        }
       } catch (error) {
         console.warn("Auto text-to-speech failed:", error);
-        setCanStartListening(true);
+        if (currentWordIdRef.current === word.id && isActiveRef.current) {
+          setCanStartListening(true);
+        }
       } finally {
-        setIsSpeaking(false);
+        if (currentWordIdRef.current === word.id && isActiveRef.current) {
+          setIsSpeaking(false);
+        }
       }
     };
 
     void autoSpeakDescription();
 
-    // Для отладки - показываем доступные голоса в консоли
     if (process.env.NODE_ENV === "development") {
       setTimeout(() => ttsService.logAvailableVoices(), 1000);
     }
-  }, [word.id, word.description]);
+  }, [word.id, word.description, resetState]);
 
   const handleSpeakDescription = async () => {
     if (isSpeaking || isListening) return;
@@ -95,57 +124,81 @@ export function SpeechExercise({
     } catch (error) {
       console.warn("Text-to-speech failed:", error);
     } finally {
-      setIsSpeaking(false);
+      if (currentWordIdRef.current === word.id && isActiveRef.current) {
+        setIsSpeaking(false);
+      }
     }
   };
 
-  const processAnswer = (transcript: string) => {
-    const textSimilarity = calculateSimilarity(transcript, targetWord);
-    const isAnswerCorrect = compareTexts(transcript, targetWord, 0.85);
+  const processAnswer = useCallback(
+    (transcript: string) => {
+      // Проверяем что мы все еще на том же слове
+      if (
+        currentWordIdRef.current !== word.id ||
+        !isActiveRef.current ||
+        hasAnswered
+      ) {
+        console.log("Ignoring stale result for word:", transcript);
+        return;
+      }
 
-    setSimilarity(textSimilarity);
-    setIsCorrect(isAnswerCorrect);
-    setIsListening(false);
-    setHasInterimResults(false);
+      const textSimilarity = calculateSimilarity(transcript, targetWord);
+      const isAnswerCorrect = compareTexts(transcript, targetWord, 0.85);
 
-    onAnswer(word.id, transcript, isAnswerCorrect);
+      setSimilarity(textSimilarity);
+      setIsCorrect(isAnswerCorrect);
+      setIsListening(false);
+      setHasInterimResults(false);
 
-    if (isAnswerCorrect) {
-      setHasAnswered(true);
-      toast.success("Correct!");
-      setTimeout(() => {
-        const speakAndContinue = async () => {
-          try {
-            setIsSpeaking(true);
-            await speakText(word.english, { lang: "en-US" });
-            handleNextWord();
-          } catch (error) {
-            console.warn("Text-to-speech failed:", error);
-            handleNextWord();
-          } finally {
-            setIsSpeaking(false);
-          }
-        };
-        void speakAndContinue();
-      }, 500);
-    } else {
-      toast.error(`Incorrect! The correct word is "${word.english}"`);
-      // Озвучиваем правильное слово при неправильном ответе
-      setTimeout(() => {
-        const speakCorrectWord = async () => {
-          try {
-            setIsSpeaking(true);
-            await speakText(word.english, { lang: "en-US" });
-          } catch (error) {
-            console.warn("Text-to-speech failed:", error);
-          } finally {
-            setIsSpeaking(false);
-          }
-        };
-        void speakCorrectWord();
-      }, 500);
-    }
-  };
+      onAnswer(word.id, transcript, isAnswerCorrect);
+
+      if (isAnswerCorrect) {
+        setHasAnswered(true);
+        toast.success("Correct!");
+        setTimeout(() => {
+          const speakAndContinue = async () => {
+            try {
+              if (currentWordIdRef.current === word.id && isActiveRef.current) {
+                setIsSpeaking(true);
+                await speakText(word.english, { lang: "en-US" });
+                handleNextWord();
+              }
+            } catch (error) {
+              console.warn("Text-to-speech failed:", error);
+              if (currentWordIdRef.current === word.id && isActiveRef.current) {
+                handleNextWord();
+              }
+            } finally {
+              if (currentWordIdRef.current === word.id && isActiveRef.current) {
+                setIsSpeaking(false);
+              }
+            }
+          };
+          void speakAndContinue();
+        }, 500);
+      } else {
+        toast.error(`Incorrect! The correct word is "${word.english}"`);
+        setTimeout(() => {
+          const speakCorrectWord = async () => {
+            try {
+              if (currentWordIdRef.current === word.id && isActiveRef.current) {
+                setIsSpeaking(true);
+                await speakText(word.english, { lang: "en-US" });
+              }
+            } catch (error) {
+              console.warn("Text-to-speech failed:", error);
+            } finally {
+              if (currentWordIdRef.current === word.id && isActiveRef.current) {
+                setIsSpeaking(false);
+              }
+            }
+          };
+          void speakCorrectWord();
+        }, 500);
+      }
+    },
+    [word.id, word.english, targetWord, hasAnswered, onAnswer],
+  );
 
   const handleStartListening = async () => {
     if (!speechSupported) {
@@ -168,13 +221,17 @@ export function SpeechExercise({
           maxAlternatives: 1,
         },
         (result: SpeechRecognitionResult) => {
-          // Обновляем transcript в реальном времени и отмечаем что есть результаты
+          // Проверяем что мы все еще на том же слове перед обработкой результата
+          if (currentWordIdRef.current !== word.id || !isActiveRef.current) {
+            console.log("Ignoring speech result for stale word");
+            return;
+          }
+
           setUserTranscript(result.transcript);
           if (result.transcript.trim().length > 0) {
             setHasInterimResults(true);
           }
 
-          // Если получили финальный результат, обрабатываем его
           if (result.isFinal && result.transcript.trim().length > 0) {
             processAnswer(result.transcript);
           }
@@ -183,20 +240,19 @@ export function SpeechExercise({
     } catch (error) {
       console.warn("Speech recognition failed:", error);
       toast.error("Failed to recognize speech. Try again.");
-      setIsListening(false);
-      setHasInterimResults(false);
+      if (currentWordIdRef.current === word.id && isActiveRef.current) {
+        setIsListening(false);
+        setHasInterimResults(false);
+      }
     }
   };
 
   const handleStopListening = () => {
     if (isListening) {
-      // Если есть промежуточные результаты, дожидаемся завершения распознавания
       if (hasInterimResults) {
-        // Не останавливаем распознавание сразу, даем ему завершиться
         return;
       }
 
-      // Если промежуточных результатов нет, просто останавливаем
       stopListening();
       setIsListening(false);
       setHasInterimResults(false);
@@ -204,17 +260,18 @@ export function SpeechExercise({
   };
 
   const handleNextWord = () => {
-    setShowRussian(false);
-    setHasAnswered(false);
-    setIsCorrect(false);
-    setUserTranscript("");
-    setSimilarity(0);
-    setHasInterimResults(false);
-    setCanStartListening(false);
-    setIsListening(false);
-    setIsSpeaking(false);
+    // Принудительно очищаем состояние перед переходом
+    resetState();
     onNext();
   };
+
+  // Cleanup при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      isActiveRef.current = false;
+      forceStopListening();
+    };
+  }, []);
 
   if (!speechSupported) {
     return (

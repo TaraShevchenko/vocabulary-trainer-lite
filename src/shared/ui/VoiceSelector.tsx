@@ -46,22 +46,70 @@ export function VoiceSelector({
 
   const loadVoices = () => {
     const availableVoices = speechSynthesis.getVoices();
-    const englishVoices = availableVoices
-      .filter((voice) => voice.lang.startsWith("en"))
-      .map((voice) => ({
-        name: voice.name,
-        lang: voice.lang,
-        default: voice.default,
-        localService: voice.localService,
-        voice: voice,
-      }))
-      .sort((a, b) => {
-        // Сортируем: сначала локальные, потом по имени
-        if (a.localService !== b.localService) {
-          return a.localService ? -1 : 1;
+    const englishVoicesRaw = availableVoices.filter((voice) =>
+      voice.lang.startsWith("en"),
+    );
+
+    // Логирование для отладки в development
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `VoiceSelector: Found ${englishVoicesRaw.length} English voices before deduplication`,
+      );
+    }
+
+    // Создаем Map для дедупликации по комбинации name + lang
+    const voiceMap = new Map<string, VoiceInfo>();
+
+    englishVoicesRaw.forEach((voice) => {
+      const key = `${voice.name}-${voice.lang}`;
+
+      // Если голос с таким ключом уже есть, оставляем только локальный (если доступен)
+      if (voiceMap.has(key)) {
+        const existing = voiceMap.get(key)!;
+        // Приоритет локальным голосам
+        if (voice.localService && !existing.localService) {
+          voiceMap.set(key, {
+            name: voice.name,
+            lang: voice.lang,
+            default: voice.default,
+            localService: voice.localService,
+            voice: voice,
+          });
         }
-        return a.name.localeCompare(b.name);
-      });
+      } else {
+        voiceMap.set(key, {
+          name: voice.name,
+          lang: voice.lang,
+          default: voice.default,
+          localService: voice.localService,
+          voice: voice,
+        });
+      }
+    });
+
+    // Преобразуем Map обратно в массив и сортируем
+    const englishVoices = Array.from(voiceMap.values()).sort((a, b) => {
+      // Сортируем: сначала локальные, потом по имени
+      if (a.localService !== b.localService) {
+        return a.localService ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    // Логирование для отладки в development
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `VoiceSelector: After deduplication: ${englishVoices.length} unique voices`,
+      );
+      console.log(
+        "Deduplicated voices:",
+        englishVoices.map((v) => ({
+          name: v.name,
+          lang: v.lang,
+          localService: v.localService,
+        })),
+      );
+    }
 
     setVoices(englishVoices);
   };
@@ -159,7 +207,7 @@ export function VoiceSelector({
             <div className="space-y-3">
               {voices.map((voice) => (
                 <Card
-                  key={voice.name}
+                  key={`${voice.name}-${voice.lang}`}
                   className={cn(
                     "cursor-pointer transition-all hover:shadow-md",
                     selectedVoice === voice.name && "ring-2 ring-blue-500",
