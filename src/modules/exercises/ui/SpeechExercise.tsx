@@ -16,7 +16,7 @@ import {
   compareTexts,
   calculateSimilarity,
 } from "@/shared/utils/textNormalization";
-import { speakText } from "@/shared/utils/textToSpeech";
+import { speakText, ttsService } from "@/shared/utils/textToSpeech";
 
 interface SpeechExerciseProps {
   word: {
@@ -67,7 +67,8 @@ export function SpeechExercise({
 
       try {
         setIsSpeaking(true);
-        await speakText(word.description, { lang: "en-US", rate: 0.8 });
+        // Используем стандартные настройки, которые автоматически адаптируются для iOS
+        await speakText(word.description, { lang: "en-US" });
         setCanStartListening(true);
       } catch (error) {
         console.warn("Auto text-to-speech failed:", error);
@@ -78,6 +79,11 @@ export function SpeechExercise({
     };
 
     void autoSpeakDescription();
+
+    // Для отладки - показываем доступные голоса в консоли
+    if (process.env.NODE_ENV === "development") {
+      setTimeout(() => ttsService.logAvailableVoices(), 1000);
+    }
   }, [word.id, word.description]);
 
   const handleSpeakDescription = async () => {
@@ -85,7 +91,7 @@ export function SpeechExercise({
 
     try {
       setIsSpeaking(true);
-      await speakText(word.description, { lang: "en-US", rate: 0.8 });
+      await speakText(word.description, { lang: "en-US" });
     } catch (error) {
       console.warn("Text-to-speech failed:", error);
     } finally {
@@ -111,7 +117,7 @@ export function SpeechExercise({
         const speakAndContinue = async () => {
           try {
             setIsSpeaking(true);
-            await speakText(word.english, { lang: "en-US", rate: 0.8 });
+            await speakText(word.english, { lang: "en-US" });
             handleNextWord();
           } catch (error) {
             console.warn("Text-to-speech failed:", error);
@@ -129,7 +135,7 @@ export function SpeechExercise({
         const speakCorrectWord = async () => {
           try {
             setIsSpeaking(true);
-            await speakText(word.english, { lang: "en-US", rate: 0.8 });
+            await speakText(word.english, { lang: "en-US" });
           } catch (error) {
             console.warn("Text-to-speech failed:", error);
           } finally {
@@ -312,7 +318,7 @@ export function SpeechExercise({
           </div>
         </div>
 
-        <div className="flex justify-center">
+        <div className="flex justify-center items-center gap-4">
           <Button
             onClick={handleNextWord}
             className="px-8"

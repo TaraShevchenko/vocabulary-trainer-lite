@@ -45,13 +45,22 @@ export const exercisesRouter = createTRPCRouter({
           description: word.description,
           progress: userProgress?.score || 0,
           lastStudied: userProgress?.updatedAt || word.createdAt,
+          // Добавляем случайное число для перемешивания среди одинаковых прогрессов
+          randomOrder: Math.random(),
         };
       });
 
-      // Сортируем по прогрессу
-      wordsWithProgress.sort((a, b) => a.progress - b.progress);
+      // Сортируем по прогрессу, а затем случайно среди одинаковых прогрессов
+      wordsWithProgress.sort((a, b) => {
+        if (a.progress !== b.progress) {
+          return a.progress - b.progress;
+        }
+        // При одинаковом прогрессе сортируем случайно
+        return a.randomOrder - b.randomOrder;
+      });
 
-      return wordsWithProgress;
+      // Убираем randomOrder из результата
+      return wordsWithProgress.map(({ randomOrder, ...word }) => word);
     }),
 
   /**

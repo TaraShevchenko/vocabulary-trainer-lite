@@ -117,8 +117,8 @@ export function GroupsList() {
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row gap-2 items-center">
-        <div className="relative flex-1 w-full">
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+        <div className="relative w-full sm:flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
           <Input
             placeholder="Search groups by name..."
@@ -138,38 +138,40 @@ export function GroupsList() {
           )}
         </div>
 
-        <Select
-          value={sortOption}
-          onValueChange={(value: SortOption) => setSortOption(value)}
-        >
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(sortLabels).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2 items-center">
+          <Select
+            value={sortOption}
+            onValueChange={(value: SortOption) => setSortOption(value)}
+          >
+            <SelectTrigger className="flex-1 sm:w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(sortLabels).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Button
-          variant={hideLearned ? "outline" : "default"}
-          onClick={toggleHideLearned}
-          className="flex items-center gap-2 whitespace-nowrap"
-        >
-          <BookCheck className="size-4" />
-        </Button>
-
-        <AddGroupModal>
           <Button
-            variant="default"
+            variant={hideLearned ? "outline" : "default"}
+            onClick={toggleHideLearned}
             className="flex items-center gap-2 whitespace-nowrap"
           >
-            <Plus className="size-4" />
+            <BookCheck className="size-4" />
           </Button>
-        </AddGroupModal>
+
+          <AddGroupModal>
+            <Button
+              variant="default"
+              className="flex items-center gap-2 whitespace-nowrap"
+            >
+              <Plus className="size-4" />
+            </Button>
+          </AddGroupModal>
+        </div>
       </div>
 
       {isLoading && !isInitialLoading && (

@@ -2,8 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Trophy, Target, CheckCircle, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Trophy,
+  Target,
+  CheckCircle,
+  XCircle,
+  Settings,
+} from "lucide-react";
 import { api } from "@/shared/api/client";
+import { VoiceSelector } from "@/shared/ui/VoiceSelector";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -276,14 +284,19 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 relative">
-      <Button
-        variant="outline"
-        onClick={handleBackToDashboard}
-        className="flex items-center gap-2 absolute left-0 -top-16"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back
-      </Button>
+      <div className="absolute left-0 -top-16 flex items-center gap-2">
+        <Button
+          variant="outline"
+          onClick={handleBackToDashboard}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+        <VoiceSelector
+          testText={currentWord?.description || "Hello, this is a test."}
+        />
+      </div>
 
       <div className="text-center">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
