@@ -45,7 +45,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
   });
   const [isSessionComplete, setIsSessionComplete] = useState(false);
 
-  // Получаем слова для упражнений
   const {
     data: words,
     isLoading: wordsLoading,
@@ -55,7 +54,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
     limit: 10,
   });
 
-  // Мутация для обновления прогресса
   const updateProgressMutation = api.exercises.updateProgress.useMutation();
 
   const currentWord = words?.[currentWordIndex];
@@ -89,7 +87,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
     userAnswer: string,
     isCorrect: boolean,
   ) => {
-    // Обновляем статистику сессии
     setSessionStats((prev) => {
       const newStats = {
         totalAnswers: prev.totalAnswers + 1,
@@ -103,7 +100,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
       return newStats;
     });
 
-    // Обновляем прогресс в базе данных
     try {
       await updateProgressMutation.mutateAsync({
         wordId,
@@ -118,7 +114,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
   const handleNext = () => {
     if (!words) return;
 
-    // Если это упражнение matching, переходим к multiple-choice
     if (currentExerciseType === "matching") {
       setHasCompletedMatching(true);
       setCurrentExerciseType("multiple-choice");
@@ -126,11 +121,9 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
       return;
     }
 
-    // Для остальных упражнений - обычная логика
     if (currentWordIndex < words.length - 1) {
       setCurrentWordIndex((prev) => prev + 1);
     } else {
-      // Переходим к следующему типу упражнения
       const currentExerciseIndex = EXERCISE_ORDER.indexOf(currentExerciseType);
       if (currentExerciseIndex < EXERCISE_ORDER.length - 1) {
         const nextExerciseType = EXERCISE_ORDER[currentExerciseIndex + 1];
@@ -199,9 +192,7 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
         <Card className="max-w-md mx-auto">
           <CardContent className="pt-6">
             <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
-              No words to study
-            </h3>
+            <h3 className="text-lg font-semibold mb-2">No words to study</h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
               There are no words for exercises in this group yet.
             </p>
@@ -224,7 +215,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
             <CardTitle className="text-2xl">Session Complete!</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Статистика */}
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <div className="text-2xl font-bold text-green-600">
@@ -248,9 +238,7 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
               <div className="text-3xl font-bold text-blue-600">
                 {accuracyPercentage}%
               </div>
-              <div className="text-gray-600 dark:text-gray-400">
-                Accuracy
-              </div>
+              <div className="text-gray-600 dark:text-gray-400">Accuracy</div>
             </div>
 
             {sessionStats.bestStreak > 0 && (
@@ -264,7 +252,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
               </div>
             )}
 
-            {/* Кнопки */}
             <div className="flex gap-3">
               <Button
                 onClick={handleRestart}
@@ -274,7 +261,8 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
                 Restart
               </Button>
               <Button onClick={handleBackToDashboard} className="flex-1">
-                <ArrowLeft className="h-4 w-4 mr-2" />To Dashboard
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                To Dashboard
               </Button>
             </div>
           </CardContent>
@@ -285,7 +273,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
 
   return (
     <div className="container mx-auto px-4 py-8 relative">
-      {/* Заголовок и навигация */}
       <Button
         variant="outline"
         onClick={handleBackToDashboard}
@@ -309,9 +296,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
         </p>
       </div>
 
-      <div className="w-20"> {/* Spacer */}</div>
-
-      {/* Прогресс сессии */}
       <div className="mb-8">
         <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
           <span>Session Progress</span>
@@ -320,7 +304,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
         <Progress value={progressPercentage} className="h-3" />
       </div>
 
-      {/* Статистика сессии */}
       <div className="flex justify-center gap-4 mb-8">
         <Badge variant="outline" className="flex items-center gap-1">
           <CheckCircle className="h-3 w-3 text-green-600" />
@@ -338,7 +321,6 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
         )}
       </div>
 
-      {/* Карточка упражнения */}
       {(currentExerciseType === "matching" || currentWord) && (
         <div className="mb-8">
           {currentExerciseType === "matching" && !hasCompletedMatching && (

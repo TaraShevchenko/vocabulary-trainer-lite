@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/shared/ui/card";
 import { cn } from "@/shared/utils/cn";
+import { speakText } from "@/shared/utils/textToSpeech";
 
 interface MatchingExerciseProps {
   words: Array<{
@@ -47,20 +48,17 @@ export function MatchingExercise({
   const [revealedRussian, setRevealedRussian] = useState<Set<string>>(
     new Set(),
   );
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // Используем все слова группы для сопоставления
   const { englishWords, descriptionWords } = useMemo(() => {
-    // Перемешиваем массивы
     const englishWords = [...words].sort(() => Math.random() - 0.5);
     const descriptionWords = [...words].sort(() => Math.random() - 0.5);
 
     return { englishWords, descriptionWords };
   }, [words]);
 
-  // Проверяем, все ли пары сопоставлены
   const isAllMatched = matchedPairs.size === words.length;
 
-  // Автоматический переход к следующему упражнению
   useEffect(() => {
     if (isAllMatched && !isLoading) {
       const nextExercisePromise = new Promise((resolve) => {
@@ -78,16 +76,11 @@ export function MatchingExercise({
     }
   }, [isAllMatched, isLoading, onNext]);
 
-  // Вычисляем общий прогресс
-  const totalProgress = Math.round(
-    words.reduce((sum, word) => sum + word.progress, 0) / words.length,
-  );
-
   const handleEnglishSelect = (englishWord: string) => {
-    // Проверяем, не сопоставлено ли уже это слово
     if (Array.from(matchedPairs.keys()).includes(englishWord)) return;
 
     setSelectedEnglish(englishWord);
+    void speakEnglishWord(englishWord);
 
     if (selectedDescription) {
       checkMatch(englishWord, selectedDescription);
@@ -95,7 +88,6 @@ export function MatchingExercise({
   };
 
   const handleDescriptionSelect = (description: string) => {
-    // Проверяем, не сопоставлено ли уже это слово
     if (Array.from(matchedPairs.values()).includes(description)) return;
 
     setSelectedDescription(description);
@@ -108,10 +100,22 @@ export function MatchingExercise({
   const handleRussianReveal = (wordId: string) => {
     setRevealedRussian((prev) => new Set(prev).add(wordId));
   };
+
+  const speakEnglishWord = async (word: string) => {
+    if ("speechSynthesis" in window) {
+      try {
+        setIsSpeaking(true);
+        await speakText(word, { lang: "en-US", rate: 0.8 });
+      } catch (error) {
+        console.warn("Text-to-speech failed:", error);
+      } finally {
+        setIsSpeaking(false);
+      }
+    }
+  };
+
   const checkMatch = (englishWord: string, description: string) => {
-    // Находим слово, которому принадлежит выбранное английское слово
     const englishWordObj = words.find((w) => w.english === englishWord);
-    // Проверяем, соответствует ли выбранное описание этому же слову
     const correct = Boolean(
       englishWordObj && englishWordObj.description === description,
     );
@@ -119,24 +123,18 @@ export function MatchingExercise({
     const pairKey = `${englishWord}-${description}`;
 
     if (correct) {
-      // Добавляем правильную пару
       setMatchedPairs((prev) => new Map(prev).set(englishWord, description));
 
-      // Показываем зеленую подсветку
       setFeedbackPairs((prev) => new Map(prev).set(pairKey, "correct"));
 
-      // Передаем результат для каждого правильно сопоставленного слова
       if (englishWordObj) {
         onAnswer(englishWordObj.id, `${englishWord} - ${description}`, true);
       }
     } else {
-      // Отмечаем неправильную попытку
       setIncorrectAttempts((prev) => new Set(prev).add(pairKey));
 
-      // Показываем красную подсветку
       setFeedbackPairs((prev) => new Map(prev).set(pairKey, "incorrect"));
 
-      // Убираем подсветку через 1 секунду
       setTimeout(() => {
         setFeedbackPairs((prev) => {
           const newMap = new Map(prev);
@@ -145,13 +143,11 @@ export function MatchingExercise({
         });
       }, 1000);
 
-      // Передаем результат неправильного ответа
       if (englishWordObj) {
         onAnswer(englishWordObj.id, `${englishWord} - ${description}`, false);
       }
     }
 
-    // Сбрасываем выбор
     setSelectedEnglish(null);
     setSelectedDescription(null);
   };
@@ -163,10 +159,10 @@ export function MatchingExercise({
     setIncorrectAttempts(new Set());
     setFeedbackPairs(new Map());
     setRevealedRussian(new Set());
+    setIsSpeaking(false);
     onNext();
   };
 
-  // Вспомогательная функция для получения классов стилей карточки
   const getCardClasses = (cardId: string, cardType: "word" | "description") => {
     let classes = "w-full transition-all duration-200 cursor-pointer ";
 
@@ -177,7 +173,6 @@ export function MatchingExercise({
       classes +=
         "border-green-500 bg-green-50 dark:bg-green-950 pointer-events-none opacity-70";
     } else {
-      // Проверяем обратную связь для этого слова
       const feedbackEntry = Array.from(feedbackPairs.entries()).find(([key]) =>
         cardType === "word"
           ? key.startsWith(cardId + "-")
@@ -203,7 +198,6 @@ export function MatchingExercise({
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 flex items-center justify-center">
       <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-6">
-        {/* Список английских слов */}
         <div className="space-y-4">
           <h2 className="text-2xl font-bold mb-4">English Words</h2>
           {englishWords.map((w) => (
@@ -225,7 +219,6 @@ export function MatchingExercise({
           ))}
         </div>
 
-        {/* Список описаний и переводов */}
         <div className="space-y-4">
           <h2 className="text-2xl font-bold mb-4">Descriptions</h2>
           {descriptionWords.map((w) => {

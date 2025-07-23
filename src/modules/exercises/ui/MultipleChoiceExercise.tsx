@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle, EyeOff, XCircle } from "lucide-react";
+import { CheckCircle, EyeOff, XCircle, Volume2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { Progress } from "@/shared/ui/progress";
 import { cn } from "@/shared/utils/cn";
+import { speakText } from "@/shared/utils/textToSpeech";
 
 interface MultipleChoiceExerciseProps {
   word: {
@@ -35,33 +35,42 @@ export function MultipleChoiceExercise({
   onNext,
   isLoading = false,
 }: MultipleChoiceExerciseProps) {
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [showResult, setShowResult] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
-  const [hasAnswered, setHasAnswered] = useState(false);
+  const [wrongAnswers, setWrongAnswers] = useState<Set<string>>(new Set());
+  const [isAnswered, setIsAnswered] = useState(false);
   const [showRussian, setShowRussian] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [blinkingChoice, setBlinkingChoice] = useState<string | null>(null);
+  const [speakingChoice, setSpeakingChoice] = useState<string | null>(null);
+  const [speakingDescription, setSpeakingDescription] = useState(false);
 
-  // Автоматический переход к следующему слову
   useEffect(() => {
-    if (hasAnswered && !isLoading) {
-      handleNext();
-    }
-  }, [hasAnswered, isLoading]);
+    const autoSpeakDescription = async () => {
+      if (!word.description || speakingChoice || speakingDescription) return;
 
-  // Генерируем варианты ответов с мемоизацией
+      try {
+        setSpeakingDescription(true);
+        await speakText(word.description, { lang: "en-US", rate: 0.8 });
+      } catch (error) {
+        console.warn("Auto text-to-speech failed:", error);
+      } finally {
+        setSpeakingDescription(false);
+      }
+    };
+
+    void autoSpeakDescription();
+  }, [word.id]);
+
   const choices = useMemo(() => {
     const correctAnswer = word.english;
     const otherWords = words.filter(
       (w) => w.id !== word.id && w.english !== correctAnswer,
     );
 
-    // Берем 3 случайных неправильных варианта
     const wrongChoices = otherWords
       .sort(() => Math.random() - 0.5)
       .slice(0, 3)
       .map((w) => w.english);
 
-    // Объединяем правильный ответ с неправильными и перемешиваем
     const allChoices = [correctAnswer, ...wrongChoices].sort(
       () => Math.random() - 0.5,
     );
@@ -69,30 +78,72 @@ export function MultipleChoiceExercise({
     return allChoices;
   }, [word.id, word.english, words]);
 
-  const handleChoiceSelect = (choice: string) => {
-    if (hasAnswered) return;
+  const handleChoiceSelect = async (choice: string) => {
+    if (isAnswered || isSpeaking) return;
 
-    setSelectedAnswer(choice);
     const correct = choice === word.english;
-    setIsCorrect(correct);
-    setShowResult(true);
-    setHasAnswered(true);
-
-    if (correct) {
-      toast.success("Правильно!");
-    } else {
-      toast.error(`Правильный ответ: ${word.english}`);
-    }
 
     onAnswer(word.id, choice, correct);
+
+    if (correct) {
+      setIsAnswered(true);
+      toast.success("Правильно!");
+
+      try {
+        setIsSpeaking(true);
+        await speakText(word.english, { lang: "en-US", rate: 0.8 });
+        handleNext();
+      } catch (error) {
+        console.warn("Text-to-speech failed:", error);
+        handleNext();
+      } finally {
+        setIsSpeaking(false);
+      }
+    } else {
+      setWrongAnswers((prev) => new Set([...prev, choice]));
+      setBlinkingChoice(choice);
+      toast.error("Неправильно! Попробуйте ещё раз");
+
+      setTimeout(() => {
+        setBlinkingChoice(null);
+      }, 600);
+    }
+  };
+
+  const handleSpeakChoice = async (choice: string) => {
+    if (speakingChoice || speakingDescription) return;
+
+    try {
+      setSpeakingChoice(choice);
+      await speakText(choice, { lang: "en-US", rate: 0.8 });
+    } catch (error) {
+      console.warn("Text-to-speech failed:", error);
+    } finally {
+      setSpeakingChoice(null);
+    }
+  };
+
+  const handleSpeakDescription = async () => {
+    if (speakingChoice || speakingDescription) return;
+
+    try {
+      setSpeakingDescription(true);
+      await speakText(word.description, { lang: "en-US", rate: 0.8 });
+    } catch (error) {
+      console.warn("Text-to-speech failed:", error);
+    } finally {
+      setSpeakingDescription(false);
+    }
   };
 
   const handleNext = () => {
-    setSelectedAnswer(null);
-    setShowResult(false);
-    setHasAnswered(false);
-    setIsCorrect(false);
+    setWrongAnswers(new Set());
+    setIsAnswered(false);
     setShowRussian(false);
+    setIsSpeaking(false);
+    setBlinkingChoice(null);
+    setSpeakingChoice(null);
+    setSpeakingDescription(false);
     onNext();
   };
 
@@ -121,82 +172,74 @@ export function MultipleChoiceExercise({
             {word.russian}
           </div>
         </div>
-        <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+        <CardTitle
+          className={cn(
+            "text-2xl font-bold text-gray-900 dark:text-gray-100 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
+            speakingDescription && "text-blue-600 dark:text-blue-400",
+          )}
+          onClick={handleSpeakDescription}
+        >
           {word.description}
         </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Варианты ответов */}
         <div className="space-y-3">
           {choices.map((choice, index) => {
-            const isSelected = selectedAnswer === choice;
+            const isWrongAnswer = wrongAnswers.has(choice);
             const isCorrectChoice = choice === word.english;
-            const showCorrect = showResult && isCorrectChoice;
-            const showIncorrect = showResult && isSelected && !isCorrectChoice;
+            const isBlinking = blinkingChoice === choice;
+            const showCorrect = isAnswered && isCorrectChoice;
+            const isChoiceSpeaking = speakingChoice === choice;
 
             return (
-              <Button
-                key={index}
-                variant="outline"
-                onClick={() => handleChoiceSelect(choice)}
-                disabled={hasAnswered || isLoading}
-                className={cn(
-                  "w-full p-4 text-left justify-start text-lg h-auto min-h-[60px]",
-                  isSelected &&
-                    !showResult &&
-                    "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20",
-                  showCorrect &&
-                    "bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300",
-                  showIncorrect &&
-                    "bg-red-100 dark:bg-red-900/30 border-red-500 text-red-700 dark:text-red-300",
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold">
-                    {String.fromCharCode(65 + index)}
-                  </span>
-                  <span className="flex-1">{choice}</span>
-                  {showCorrect && (
-                    <CheckCircle className="h-5 w-5 text-green-600" />
+              <div key={index} className="flex items-center gap-2">
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => handleSpeakChoice(choice)}
+                  disabled={!!speakingChoice || speakingDescription}
+                  className={cn(
+                    isChoiceSpeaking && "text-blue-600 dark:text-blue-400",
                   )}
-                  {showIncorrect && (
-                    <XCircle className="h-5 w-5 text-red-600" />
+                >
+                  <Volume2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleChoiceSelect(choice)}
+                  disabled={
+                    isWrongAnswer || isAnswered || isLoading || isSpeaking
+                  }
+                  className={cn(
+                    "flex-1 p-4 text-left justify-start text-lg h-auto min-h-[60px] transition-all duration-150",
+                    isWrongAnswer &&
+                      "bg-red-100 dark:bg-red-900/30 border-red-300 text-red-500 dark:text-red-400 opacity-50 cursor-not-allowed",
+                    showCorrect &&
+                      "bg-green-100 dark:bg-green-900/30 border-green-500 text-green-700 dark:text-green-300",
+                    isBlinking &&
+                      "animate-pulse bg-red-200 dark:bg-red-800/50 border-red-500",
                   )}
-                </div>
-              </Button>
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-sm font-semibold">
+                      {String.fromCharCode(65 + index)}
+                    </span>
+                    <span className="flex-1">{choice}</span>
+                    {showCorrect && (
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    )}
+                    {isWrongAnswer && (
+                      <XCircle className="h-5 w-5 text-red-600" />
+                    )}
+                  </div>
+                </Button>
+              </div>
             );
           })}
         </div>
 
-        {showResult && !isCorrect && (
-          <div
-            className={cn(
-              "p-4 rounded-lg border-2 text-center space-y-2 border-red-500 bg-red-50 dark:bg-red-900/20",
-            )}
-          >
-            <div className="text-sm">
-              <span className="text-gray-600 dark:text-gray-400">
-                Правильный ответ:{" "}
-              </span>
-              <span className="font-semibold text-gray-900 dark:text-gray-100">
-                {word.english}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Автоматический переход */}
-        {hasAnswered && (
-          <div className="text-center">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Переход к следующему слову...
-            </div>
-          </div>
-        )}
-
-        {/* Подсказка */}
-        {!hasAnswered && (
+        {!isAnswered && !isSpeaking && (
           <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
             Choose the correct English translation
           </div>

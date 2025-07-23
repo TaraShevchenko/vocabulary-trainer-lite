@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { EyeOff, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
-import { Input } from "@/shared/ui/input";
-import { Progress } from "@/shared/ui/progress";
 import { cn } from "@/shared/utils/cn";
+import { speakText } from "@/shared/utils/textToSpeech";
 
 interface TypingExerciseProps {
   word: {
@@ -22,66 +21,158 @@ interface TypingExerciseProps {
   isLoading?: boolean;
 }
 
+interface LetterButton {
+  id: string;
+  letter: string;
+  originalIndex: number;
+}
+
 export function TypingExercise({
   word,
   onAnswer,
   onNext,
   isLoading = false,
 }: TypingExerciseProps) {
-  const [userAnswer, setUserAnswer] = useState("");
-  const [showResult, setShowResult] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
-  const [hasAnswered, setHasAnswered] = useState(false);
   const [showRussian, setShowRussian] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [availableLetters, setAvailableLetters] = useState<LetterButton[]>([]);
+  const [selectedLetters, setSelectedLetters] = useState<LetterButton[]>([]);
+  const [errorLetters, setErrorLetters] = useState<Set<string>>(new Set());
+  const [hasAnswered, setHasAnswered] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingDescription, setSpeakingDescription] = useState(false);
 
-  const handleSubmit = () => {
-    if (!userAnswer.trim() || hasAnswered) return;
+  const targetWord = word.english.toLowerCase();
+  const targetLetters = targetWord.split("");
 
-    const correct =
-      userAnswer.toLowerCase().trim() === word.english.toLowerCase().trim();
-    setIsCorrect(correct);
-    setShowResult(true);
-    setHasAnswered(true);
+  useEffect(() => {
+    const letters = targetWord.split("").map((letter, index) => ({
+      id: `${letter}-${index}`,
+      letter: letter === " " ? "␣" : letter,
+      originalIndex: index,
+    }));
 
-    if (correct) {
-      toast.success("Correct!");
-    } else {
-      toast.error(`Correct answer: ${word.english}`);
-    }
-
-    onAnswer(word.id, userAnswer, correct);
-
-    handleNextWord();
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 1000);
-  };
-
-  const handleNextWord = () => {
-    setUserAnswer("");
-    setShowResult(false);
+    const shuffled = [...letters].sort(() => Math.random() - 0.5);
+    setAvailableLetters(shuffled);
+    setSelectedLetters([]);
+    setErrorLetters(new Set());
     setHasAnswered(false);
     setIsCorrect(false);
     setShowRussian(false);
-    onNext();
-  };
+    setIsSpeaking(false);
+    setSpeakingDescription(false);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !hasAnswered) {
-      handleSubmit();
-    } else if (e.key === "Enter" && hasAnswered) {
-      handleNextWord();
+    const autoSpeakDescription = async () => {
+      if (!word.description || speakingDescription || isSpeaking) return;
+
+      try {
+        setSpeakingDescription(true);
+        await speakText(word.description, { lang: "en-US", rate: 0.8 });
+      } catch (error) {
+        console.warn("Auto text-to-speech failed:", error);
+      } finally {
+        setSpeakingDescription(false);
+      }
+    };
+
+    void autoSpeakDescription();
+  }, [word.id, word.english, targetWord]);
+
+  const handleLetterClick = async (clickedLetter: LetterButton) => {
+    if (hasAnswered || errorLetters.has(clickedLetter.id) || isSpeaking) return;
+
+    const nextExpectedIndex = selectedLetters.length;
+    const expectedLetter = targetLetters[nextExpectedIndex];
+
+    if (
+      (clickedLetter.letter === "␣" ? " " : clickedLetter.letter) ===
+      expectedLetter
+    ) {
+      setSelectedLetters((prev) => [...prev, clickedLetter]);
+      setAvailableLetters((prev) =>
+        prev.filter((letter) => letter.id !== clickedLetter.id),
+      );
+
+      if (selectedLetters.length + 1 === targetLetters.length) {
+        const userAnswer = [...selectedLetters, clickedLetter]
+          .map((l) => (l.letter === "␣" ? " " : l.letter))
+          .join("");
+
+        setIsCorrect(true);
+        setHasAnswered(true);
+        toast.success("Correct!");
+        onAnswer(word.id, userAnswer, true);
+
+        try {
+          setIsSpeaking(true);
+          await speakText(word.english, { lang: "en-US", rate: 0.8 });
+          handleNextWord();
+        } catch (error) {
+          console.warn("Text-to-speech failed:", error);
+          handleNextWord();
+        } finally {
+          setIsSpeaking(false);
+        }
+      }
+    } else {
+      setErrorLetters((prev) => new Set(prev).add(clickedLetter.id));
+      toast.error("Wrong letter!");
+
+      setTimeout(() => {
+        setErrorLetters((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(clickedLetter.id);
+          return newSet;
+        });
+      }, 1000);
+
+      if (selectedLetters.length === 0) {
+        const userAnswer =
+          clickedLetter.letter === "␣" ? " " : clickedLetter.letter;
+        onAnswer(word.id, userAnswer, false);
+      }
     }
   };
 
-  // Автофокус на поле ввода при загрузке компонента
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  const handleSpeakDescription = async () => {
+    if (speakingDescription || isSpeaking) return;
+
+    try {
+      setSpeakingDescription(true);
+      await speakText(word.description, { lang: "en-US", rate: 0.8 });
+    } catch (error) {
+      console.warn("Text-to-speech failed:", error);
+    } finally {
+      setSpeakingDescription(false);
+    }
+  };
+
+  const handleNextWord = () => {
+    setShowRussian(false);
+    setHasAnswered(false);
+    setIsCorrect(false);
+    setIsSpeaking(false);
+    setSpeakingDescription(false);
+    onNext();
+  };
+
+  const handleRestart = () => {
+    const letters = targetWord.split("").map((letter, index) => ({
+      id: `${letter}-${index}`,
+      letter: letter === " " ? "␣" : letter,
+      originalIndex: index,
+    }));
+
+    const shuffled = [...letters].sort(() => Math.random() - 0.5);
+    setAvailableLetters(shuffled);
+    setSelectedLetters([]);
+    setErrorLetters(new Set());
+    setHasAnswered(false);
+    setIsCorrect(false);
+  };
 
   return (
-    <Card className="max-w-128 w-full mx-auto">
+    <Card className="max-w-4xl w-full mx-auto">
       <CardHeader className="text-center">
         <div className="mb-4 relative w-fit mx-auto">
           {!showRussian && (
@@ -105,60 +196,101 @@ export function TypingExercise({
             {word.russian}
           </div>
         </div>
-        <CardTitle className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+        <CardTitle
+          className={cn(
+            "text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
+            speakingDescription && "text-blue-600 dark:text-blue-400",
+          )}
+          onClick={handleSpeakDescription}
+        >
           {word.description}
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-2">
-        {/* Поле ввода */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Enter the English word:
-          </label>
-          <Input
-            ref={inputRef}
-            value={userAnswer}
-            onChange={(e) => setUserAnswer(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Your answer..."
-            disabled={hasAnswered || isLoading}
-            className={cn(
-              "text-center text-lg",
-              showResult &&
-                (isCorrect
-                  ? "border-green-500 bg-green-50 dark:bg-green-900/20"
-                  : "border-red-500 bg-red-50 dark:bg-red-900/20"),
-            )}
-          />
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-center">Your Answer:</h3>
+          <div className="flex flex-wrap justify-center gap-2 min-h-[60px] p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            {targetLetters.map((_, index) => {
+              const selectedLetter = selectedLetters[index];
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    "w-12 h-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center text-lg font-bold transition-all duration-200",
+                    selectedLetter &&
+                      "border-solid border-green-500 bg-green-50 dark:bg-green-900/20",
+                  )}
+                >
+                  {selectedLetter && (
+                    <span className="text-green-700 dark:text-green-300">
+                      {selectedLetter.letter === "␣"
+                        ? "␣"
+                        : selectedLetter.letter.toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Кнопки */}
-        <div className="flex gap-3">
-          {!hasAnswered ? (
-            <Button
-              onClick={handleSubmit}
-              disabled={!userAnswer.trim() || isLoading}
-              className="flex-1"
-            >
-              {isLoading ? "Checking..." : "Check"}
-            </Button>
-          ) : (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-center">
+            Available Letters:
+          </h3>
+          <div className="flex flex-wrap justify-center gap-3 min-h-[80px] p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            {availableLetters.map((letter) => (
+              <Button
+                key={letter.id}
+                onClick={() => handleLetterClick(letter)}
+                disabled={hasAnswered || isLoading || isSpeaking}
+                className={cn(
+                  "w-12 h-12 text-lg font-bold transition-all duration-200",
+                  errorLetters.has(letter.id) &&
+                    "bg-red-500 hover:bg-red-500 animate-pulse",
+                  letter.letter === "␣" &&
+                    "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300",
+                )}
+                variant={
+                  errorLetters.has(letter.id) ? "destructive" : "outline"
+                }
+              >
+                {letter.letter === "␣" ? "␣" : letter.letter.toUpperCase()}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex gap-3 justify-center">
+          {hasAnswered ? (
             <Button
               onClick={handleNextWord}
-              className="flex-1"
+              className="px-8"
               variant="outline"
+              disabled={isSpeaking}
             >
               <RotateCcw className="h-4 w-4 mr-2" />
               Next Word
             </Button>
+          ) : (
+            <Button
+              onClick={handleRestart}
+              variant="outline"
+              className="px-8"
+              disabled={isLoading || isSpeaking}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Restart
+            </Button>
           )}
         </div>
 
-        {/* Подсказка */}
-        <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-          Press Enter to submit your answer
-        </div>
+        {!hasAnswered && !isSpeaking && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            Click letters in the correct order to spell the word
+          </div>
+        )}
       </CardContent>
     </Card>
   );
