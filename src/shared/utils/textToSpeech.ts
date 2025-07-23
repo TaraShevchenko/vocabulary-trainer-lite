@@ -25,12 +25,10 @@ export class TextToSpeechService {
   }
 
   private findBestVoice(lang: string): SpeechSynthesisVoice | null {
-    const langPrefix = lang.split("-")[0];
+    const langPrefix = lang.split("-")[0] ?? lang;
     return (
       this.voices.find((voice) => voice.lang === lang) ||
-      this.voices.find(
-        (voice) => voice.lang && voice.lang.startsWith(langPrefix),
-      ) ||
+      this.voices.find((voice) => voice.lang?.startsWith(langPrefix)) ||
       this.voices.find((voice) => voice.default) ||
       this.voices[0] ||
       null

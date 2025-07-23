@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
 import { Progress } from "@/shared/ui/progress";
 import { MatchingExercise } from "./MatchingExercise";
 import { MultipleChoiceExercise } from "./MultipleChoiceExercise";
+import { SpeechExercise } from "./SpeechExercise";
 import { TypingExercise } from "./TypingExercise";
 
 interface ExerciseSessionProps {
@@ -26,9 +27,9 @@ interface SessionStats {
   bestStreak: number;
 }
 
-type ExerciseType = "matching" | "multiple-choice" | "typing";
+type ExerciseType = "matching" | "multiple-choice" | "typing" | "speech";
 
-const EXERCISE_ORDER: ExerciseType[] = ["multiple-choice", "typing"];
+const EXERCISE_ORDER: ExerciseType[] = ["multiple-choice", "speech", "typing"];
 
 export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
   const router = useRouter();
@@ -77,6 +78,8 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
         return 6;
       case "typing":
         return 15;
+      case "speech":
+        return 20;
       default:
         return 10;
     }
@@ -342,6 +345,14 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
           )}
           {currentExerciseType === "typing" && currentWord && (
             <TypingExercise
+              word={currentWord}
+              onAnswer={handleAnswer}
+              onNext={handleNext}
+              isLoading={updateProgressMutation.isPending}
+            />
+          )}
+          {currentExerciseType === "speech" && currentWord && (
+            <SpeechExercise
               word={currentWord}
               onAnswer={handleAnswer}
               onNext={handleNext}
