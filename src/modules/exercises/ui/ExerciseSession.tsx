@@ -2,14 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Trophy,
-  Target,
-  CheckCircle,
-  XCircle,
-  Settings,
-} from "lucide-react";
+import { ArrowLeft, Trophy, Target, CheckCircle, XCircle } from "lucide-react";
 import { api } from "@/shared/api/client";
 import { VoiceSelector } from "@/shared/ui/VoiceSelector";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
@@ -58,10 +51,7 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
     data: words,
     isLoading: wordsLoading,
     error: wordsError,
-  } = api.exercises.getWordsForExercise.useQuery({
-    groupId,
-    limit: 10,
-  });
+  } = api.exercises.getWordsForExercise.useQuery({ groupId, limit: 50 });
 
   const updateProgressMutation = api.exercises.updateProgress.useMutation();
 
@@ -69,7 +59,7 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
   const progressPercentage = words
     ? currentExerciseType === "matching"
       ? Math.round((sessionStats.correctAnswers / words.length) * 100)
-      : Math.round(((currentWordIndex + 1) / words.length) * 100) - 10
+      : Math.round(((currentWordIndex + 1) / words.length) * 100)
     : 0;
   const accuracyPercentage =
     sessionStats.totalAnswers > 0

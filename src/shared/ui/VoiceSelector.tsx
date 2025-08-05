@@ -45,6 +45,8 @@ export function VoiceSelector({
   }, []);
 
   const loadVoices = () => {
+    if (typeof window === "undefined") return;
+
     const availableVoices = speechSynthesis.getVoices();
     const englishVoicesRaw = availableVoices.filter((voice) =>
       voice.lang.startsWith("en"),
@@ -115,6 +117,8 @@ export function VoiceSelector({
   };
 
   const loadSelectedVoice = () => {
+    if (typeof window === "undefined") return;
+
     const saved = localStorage.getItem(VOICE_STORAGE_KEY);
     if (saved) {
       setSelectedVoice(saved);
@@ -123,13 +127,15 @@ export function VoiceSelector({
 
   const handleVoiceSelect = (voiceName: string) => {
     setSelectedVoice(voiceName);
-    localStorage.setItem(VOICE_STORAGE_KEY, voiceName);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(VOICE_STORAGE_KEY, voiceName);
+    }
     // Уведомляем TTS сервис о новом выборе
     ttsService.setPreferredVoice(voiceName);
   };
 
   const testVoice = async (voice: VoiceInfo) => {
-    if (isSpeaking) return;
+    if (isSpeaking || typeof window === "undefined") return;
 
     setTestingVoice(voice.name);
     setIsSpeaking(true);
@@ -171,6 +177,8 @@ export function VoiceSelector({
 
   // Обновляем голоса когда они загружаются
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const handleVoicesChanged = () => {
       loadVoices();
     };

@@ -91,6 +91,7 @@ export function MatchingExercise({
     if (Array.from(matchedPairs.values()).includes(description)) return;
 
     setSelectedDescription(description);
+    void speakDescription(description);
 
     if (selectedEnglish) {
       checkMatch(selectedEnglish, description);
@@ -106,6 +107,19 @@ export function MatchingExercise({
       try {
         setIsSpeaking(true);
         await speakText(word, { lang: "en-US", rate: 0.8 });
+      } catch (error) {
+        console.warn("Text-to-speech failed:", error);
+      } finally {
+        setIsSpeaking(false);
+      }
+    }
+  };
+
+  const speakDescription = async (description: string) => {
+    if ("speechSynthesis" in window) {
+      try {
+        setIsSpeaking(true);
+        await speakText(description, { lang: "en-US", rate: 0.8 });
       } catch (error) {
         console.warn("Text-to-speech failed:", error);
       } finally {

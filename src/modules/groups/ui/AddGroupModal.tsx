@@ -244,19 +244,7 @@ export function AddGroupModal({ children }: AddGroupModalProps) {
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>Words</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addWord}
-                className="flex items-center gap-2"
-              >
-                <Plus className="size-4" />
-                Add Word
-              </Button>
-            </div>
+            <Label>Words</Label>
 
             {errors.words && (
               <p className="text-sm text-red-500">{errors.words.message}</p>
@@ -331,6 +319,19 @@ export function AddGroupModal({ children }: AddGroupModalProps) {
                   </div>
                 </div>
               ))}
+
+              <div className="h-14 border-2 border-dashed bg-transparent dark:bg-input/30 border-input rounded-lg">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="full"
+                  onClick={addWord}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="size-4" />
+                  Add Word
+                </Button>
+              </div>
             </div>
           </div>
 

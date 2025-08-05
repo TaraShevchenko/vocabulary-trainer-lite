@@ -6,24 +6,30 @@ export interface TTSOptions {
 }
 
 export class TextToSpeechService {
-  private synthesis: SpeechSynthesis;
+  private synthesis: SpeechSynthesis | null = null;
   private voices: SpeechSynthesisVoice[] = [];
   private preferredVoiceName: string | null = null;
 
   constructor() {
-    this.synthesis = window.speechSynthesis;
-    this.loadVoices();
-    this.loadPreferredVoice();
+    if (typeof window !== "undefined") {
+      this.synthesis = window.speechSynthesis;
+      this.loadVoices();
+      this.loadPreferredVoice();
+    }
   }
 
   private loadVoices() {
+    if (!this.synthesis) return;
+
     this.voices = this.synthesis.getVoices();
 
     if (this.voices.length === 0) {
       this.synthesis.addEventListener("voiceschanged", () => {
-        this.voices = this.synthesis.getVoices();
-        // Перезагружаем предпочтительный голос когда голоса становятся доступными
-        this.loadPreferredVoice();
+        if (this.synthesis) {
+          this.voices = this.synthesis.getVoices();
+          // Перезагружаем предпочтительный голос когда голоса становятся доступными
+          this.loadPreferredVoice();
+        }
       });
     }
   }
@@ -51,7 +57,9 @@ export class TextToSpeechService {
     }
 
     // Для iOS пытаемся найти более качественные голоса
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isIOS =
+      typeof window !== "undefined" &&
+      /iPad|iPhone|iPod/.test(navigator.userAgent);
 
     if (isIOS) {
       // На iOS ищем специфичные голоса, которые звучат лучше
@@ -120,7 +128,9 @@ export class TextToSpeechService {
       utterance.lang = lang;
 
       // Специальные настройки для iOS для более естественного звучания
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isIOS =
+        typeof window !== "undefined" &&
+        /iPad|iPhone|iPod/.test(navigator.userAgent);
       if (isIOS) {
         utterance.rate = options.rate || 0.7; // Медленнее на iOS
         utterance.pitch = options.pitch || 0.9; // Чуть ниже тон
