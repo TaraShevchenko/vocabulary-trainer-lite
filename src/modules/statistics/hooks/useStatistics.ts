@@ -2,7 +2,10 @@
 
 import { useMemo } from "react";
 import { api } from "@/shared/api/client";
-import type { StatisticsData, SlideData } from "../types/statistics";
+import type {
+  StatisticsData,
+  SlideData,
+} from "../types/statistics-silder.types";
 
 export function useStatistics() {
   const {

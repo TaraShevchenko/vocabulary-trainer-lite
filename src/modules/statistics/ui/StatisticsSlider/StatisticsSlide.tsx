@@ -1,6 +1,6 @@
 "use client";
 
-import type { SlideData } from "../types/statistics";
+import type { SlideData } from "../../types/statistics-silder.types";
 
 interface StatisticsSlideProps {
   slide: SlideData;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { SliderState } from "../types/statistics";
+import type { SliderState } from "../types/statistics-silder.types";
 
 interface UseSliderProps {
   totalSlides: number;

@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import { Skeleton } from "@/shared/ui/skeleton";
 import { cn } from "@/shared/utils/cn";
-import { useSlider } from "../hooks/useSlider";
-import { useStatistics } from "../hooks/useStatistics";
+import { useSlider } from "../../hooks/useSlider";
+import { useStatistics } from "../../hooks/useStatistics";
 import { SliderNavigation } from "./SliderNavigation";
 import { StatisticsSlide } from "./StatisticsSlide";
 

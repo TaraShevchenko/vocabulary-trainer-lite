@@ -1,3 +1,2 @@
-export { StatisticsSlider } from "./StatisticsSlider";
-export { StatisticsSlide } from "./StatisticsSlide";
-export { SliderNavigation } from "./SliderNavigation";
+export { StatisticsSlider } from "./StatisticsSlider/StatisticsSlider";
+export { StreakWeekWidget } from "./StreakWeek/StreakWeekWidget";

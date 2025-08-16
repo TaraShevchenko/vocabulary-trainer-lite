@@ -108,7 +108,7 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
         progressIncrement: getProgressIncrement(currentExerciseType),
       });
     } catch (error) {
-      console.error("Ошибка при обновлении прогресса:", error);
+      console.error("Error updating progress:", error);
     }
   };
 

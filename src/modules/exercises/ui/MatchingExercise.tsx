@@ -64,14 +64,14 @@ export function MatchingExercise({
       const nextExercisePromise = new Promise((resolve) => {
         setTimeout(() => {
           onNext();
-          resolve("Переход выполнен!");
+          resolve("Transition completed!");
         }, 500);
       });
 
       void toast.promise(nextExercisePromise, {
-        loading: "Переход к следующему упражнению...",
-        success: "Переход выполнен!",
-        error: "Ошибка при переходе",
+        loading: "Transition to next exercise...",
+        success: "Transition completed!",
+        error: "Error transitioning",
       });
     }
   }, [isAllMatched, isLoading, onNext]);
@@ -164,17 +164,6 @@ export function MatchingExercise({
 
     setSelectedEnglish(null);
     setSelectedDescription(null);
-  };
-
-  const handleNext = () => {
-    setSelectedEnglish(null);
-    setSelectedDescription(null);
-    setMatchedPairs(new Map());
-    setIncorrectAttempts(new Set());
-    setFeedbackPairs(new Map());
-    setRevealedRussian(new Set());
-    setIsSpeaking(false);
-    onNext();
   };
 
   const getCardClasses = (cardId: string, cardType: "word" | "description") => {

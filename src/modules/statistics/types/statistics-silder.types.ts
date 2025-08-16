@@ -10,6 +10,9 @@ export interface StreakStatistics {
   wordsInReview: number;
   streakDays: number;
   hasActiveStreak: boolean;
+  completedToday?: boolean;
+  lastActivityDate?: Date | string | null;
+  week?: { date: Date | string; hasActivity: boolean; isToday: boolean }[];
 }
 
 export interface TodayStatistics {
