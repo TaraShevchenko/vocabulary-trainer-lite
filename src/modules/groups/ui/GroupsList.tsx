@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, X, Eye, EyeOff, BookCheck, Plus } from "lucide-react";
+import { Search, X, Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/shared/api/client";
 import { useDebounce, useInfiniteScroll } from "@/shared/hooks";
@@ -22,20 +22,27 @@ import { GroupCard } from "./GroupCard";
 enum SortOption {
   FAVORITES = "favorites",
   NEWEST = "newest",
+  RECENTLY_LEARNED = "recently_learned",
+  WITHOUT_LEARNED = "without_learned",
+  GLOBAL = "global",
 }
 
 const sortLabels = {
   [SortOption.FAVORITES]: "Favorites",
   [SortOption.NEWEST]: "Recently added",
+  [SortOption.RECENTLY_LEARNED]: "Recently learned",
+  [SortOption.WITHOUT_LEARNED]: "Without learned",
+  [SortOption.GLOBAL]: "Global",
 };
 
 export function GroupsList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<SortOption>(
-    SortOption.FAVORITES,
+    SortOption.RECENTLY_LEARNED,
   );
-  const [hideLearned, setHideLearned] = useState(true);
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const isGlobal = sortOption === SortOption.GLOBAL;
+  const hideLearned = sortOption === SortOption.WITHOUT_LEARNED;
 
   const {
     data,
@@ -50,6 +57,7 @@ export function GroupsList() {
       search: debouncedSearchQuery || undefined,
       sortBy: sortOption,
       hideLearned,
+      isGlobal,
     },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -80,10 +88,6 @@ export function GroupsList() {
 
   const clearSearch = () => {
     setSearchQuery("");
-  };
-
-  const toggleHideLearned = () => {
-    setHideLearned(!hideLearned);
   };
 
   const allGroups = data?.pages.flatMap((page) => page.groups) || [];
@@ -141,7 +145,7 @@ export function GroupsList() {
         <div className="flex gap-2 items-center">
           <Select
             value={sortOption}
-            onValueChange={(value: SortOption) => setSortOption(value)}
+            onValueChange={(value) => setSortOption(value as SortOption)}
           >
             <SelectTrigger className="flex-1 sm:w-[200px]">
               <SelectValue />
@@ -154,14 +158,6 @@ export function GroupsList() {
               ))}
             </SelectContent>
           </Select>
-
-          <Button
-            variant={hideLearned ? "outline" : "default"}
-            onClick={toggleHideLearned}
-            className="flex items-center gap-2 whitespace-nowrap"
-          >
-            <BookCheck className="size-4" />
-          </Button>
 
           <AddGroupModal>
             <Button

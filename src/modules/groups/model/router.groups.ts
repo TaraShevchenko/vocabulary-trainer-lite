@@ -4,7 +4,13 @@ import { z } from "zod";
 import { db } from "@/shared/api/db";
 import { createTRPCRouter, protectedProcedure } from "@/shared/api/trpc";
 
-const SortOption = z.enum(["favorites", "newest", "alphabetical"]);
+const SortOption = z.enum([
+  "favorites",
+  "newest",
+  "recently_learned",
+  "without_learned",
+  "global",
+]);
 
 export const groupsRouter = createTRPCRouter({
   getPaginated: protectedProcedure
@@ -15,73 +21,95 @@ export const groupsRouter = createTRPCRouter({
         search: z.string().optional(),
         sortBy: SortOption.default("favorites"),
         hideLearned: z.boolean().default(true),
+        isGlobal: z.boolean().default(false),
       }),
     )
     .query(async ({ input, ctx }) => {
-      const { limit, cursor, search, sortBy, hideLearned } = input;
+      const { limit, cursor, search, sortBy, hideLearned, isGlobal } = input;
       const userId = ctx.session.user.id;
 
-      const whereClause: Prisma.WordGroupWhereInput = {};
+      let whereClause: Prisma.WordGroupWhereInput = {};
+      const andConditions: Prisma.WordGroupWhereInput[] = [];
 
       if (search) {
-        whereClause.name = {
-          contains: search,
-          mode: "insensitive",
-        };
+        andConditions.push({
+          name: {
+            contains: search,
+            mode: "insensitive",
+          },
+        });
       }
 
       if (hideLearned) {
-        whereClause.words = {
-          some: {
-            OR: [
-              {
-                progress: {
-                  none: {
-                    userId,
-                  },
-                },
-              },
-              {
-                progress: {
-                  some: {
-                    userId,
-                    score: {
-                      lt: 100,
+        andConditions.push({
+          words: {
+            some: {
+              OR: [
+                {
+                  progress: {
+                    none: {
+                      userId,
                     },
                   },
                 },
-              },
-            ],
+                {
+                  progress: {
+                    some: {
+                      userId,
+                      score: {
+                        lt: 100,
+                      },
+                    },
+                  },
+                },
+              ],
+            },
           },
-        };
+        });
       }
 
-      let orderBy: Array<{
-        favoritedByUsers?: { _count: "desc" };
-        name?: "asc";
-        createdAt?: "desc";
-      }> = [];
+      if (isGlobal) {
+        andConditions.push({ isGlobal: true });
+      } else {
+        andConditions.push({
+          OR: [
+            { createdBy: userId },
+            { favoritedByUsers: { some: { id: userId } } },
+          ],
+        });
+      }
+
+      if (andConditions.length > 0) {
+        whereClause = { AND: andConditions };
+      }
+
+      let orderBy: Prisma.WordGroupOrderByWithRelationInput[] = [];
       switch (sortBy) {
         case "favorites":
           orderBy = [
-            {
-              favoritedByUsers: {
-                _count: "desc",
-              },
-            },
-            {
-              name: "asc",
-            },
+            { favoritedByUsers: { _count: "desc" } },
+            { name: "asc" },
           ];
           break;
         case "newest":
+          orderBy = [{ createdAt: "desc" }];
+          break;
+        case "recently_learned":
+          orderBy = [];
+          break;
+        case "global":
+          orderBy = [];
+          break;
+        case "without_learned":
           orderBy = [
-            {
-              createdAt: "desc",
-            },
+            { favoritedByUsers: { _count: "desc" } },
+            { createdAt: "desc" },
           ];
           break;
       }
+
+      const requiresDerivedSort =
+        sortBy === "recently_learned" || sortBy === "global";
 
       const groups = await db.wordGroup.findMany({
         where: whereClause,
@@ -104,10 +132,12 @@ export const groupsRouter = createTRPCRouter({
             },
           },
         },
-        orderBy,
-        take: limit + 1,
-        skip: cursor ? cursor : 0,
+        orderBy: requiresDerivedSort ? undefined : orderBy,
+        take: requiresDerivedSort ? undefined : limit + 1,
+        skip: requiresDerivedSort ? undefined : cursor ? cursor : 0,
       });
+
+      
 
       const groupsWithStats = groups.map((group) => {
         const totalWords = group.words.length;
@@ -120,17 +150,17 @@ export const groupsRouter = createTRPCRouter({
           };
         });
 
-        const totalProgress = wordsWithUserProgress.reduce(
-          (sum, word) => sum + word.userScore,
-          0,
-        );
+        const totalProgress = wordsWithUserProgress.reduce((sum: number, w) => sum + w.userScore, 0);
 
         const averageProgress =
           totalWords > 0 ? Math.round(totalProgress / totalWords) : 0;
 
-        const completedWords = wordsWithUserProgress.filter(
-          (word) => word.userScore >= 100,
-        ).length;
+        const completedWords = wordsWithUserProgress.filter((w) => w.userScore >= 100).length;
+
+        const lastLearnedAt = group.words
+          .map((w) => w.progress[0]?.updatedAt)
+          .filter((d): d is Date => Boolean(d))
+          .sort((a, b) => b.getTime() - a.getTime())[0] || null;
 
         return {
           id: group.id,
@@ -142,27 +172,55 @@ export const groupsRouter = createTRPCRouter({
           isFavorite: group.favoritedByUsers.length > 0,
           createdAt: group.createdAt,
           updatedAt: group.updatedAt,
+          lastLearnedAt,
         };
       });
 
       let nextCursor: number | undefined = undefined;
-      if (groups.length > limit) {
-        groupsWithStats.pop();
-        nextCursor = (cursor || 0) + limit;
-      }
 
-      let totalCount: number | undefined = undefined;
-      if (!cursor) {
-        totalCount = await db.wordGroup.count({
-          where: whereClause,
+      if (requiresDerivedSort) {
+        const sorted = groupsWithStats.sort((a, b) => {
+          const aTime = a.lastLearnedAt ? a.lastLearnedAt.getTime() : 0;
+          const bTime = b.lastLearnedAt ? b.lastLearnedAt.getTime() : 0;
+          if (bTime !== aTime) return bTime - aTime;
+          return b.createdAt.getTime() - a.createdAt.getTime();
         });
-      }
 
-      return {
-        groups: groupsWithStats,
-        nextCursor,
-        totalCount,
-      };
+        const start = cursor || 0;
+        const end = start + limit;
+        const pageSlice = sorted.slice(start, end);
+        const hasMore = end < sorted.length;
+        nextCursor = hasMore ? end : undefined;
+
+        let totalCount: number | undefined = undefined;
+        if (!cursor) {
+          totalCount = sorted.length;
+        }
+
+        return {
+          groups: pageSlice,
+          nextCursor,
+          totalCount,
+        };
+      } else {
+        if (groups.length > limit) {
+          groupsWithStats.pop();
+          nextCursor = (cursor || 0) + limit;
+        }
+
+        let totalCount: number | undefined = undefined;
+        if (!cursor) {
+          totalCount = await db.wordGroup.count({
+            where: whereClause,
+          });
+        }
+
+        return {
+          groups: groupsWithStats,
+          nextCursor,
+          totalCount,
+        };
+      }
     }),
 
   getAll: protectedProcedure.query(async ({ ctx }) => {
