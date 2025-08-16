@@ -4,13 +4,7 @@ import { z } from "zod";
 import { db } from "@/shared/api/db";
 import { createTRPCRouter, protectedProcedure } from "@/shared/api/trpc";
 
-const SortOption = z.enum([
-  "favorites",
-  "newest",
-  "recently_learned",
-  "without_learned",
-  "global",
-]);
+const SortOption = z.enum(["favorites", "newest", "recently_learned"]);
 
 export const groupsRouter = createTRPCRouter({
   getPaginated: protectedProcedure
@@ -20,12 +14,12 @@ export const groupsRouter = createTRPCRouter({
         cursor: z.number().optional(),
         search: z.string().optional(),
         sortBy: SortOption.default("favorites"),
-        hideLearned: z.boolean().default(true),
-        isGlobal: z.boolean().default(false),
+        onlyLearned: z.boolean().default(false),
+        globalOnly: z.boolean().default(false),
       }),
     )
     .query(async ({ input, ctx }) => {
-      const { limit, cursor, search, sortBy, hideLearned, isGlobal } = input;
+      const { limit, cursor, search, sortBy, onlyLearned, globalOnly } = input;
       const userId = ctx.session.user.id;
 
       let whereClause: Prisma.WordGroupWhereInput = {};
@@ -40,41 +34,31 @@ export const groupsRouter = createTRPCRouter({
         });
       }
 
-      if (hideLearned) {
+      if (onlyLearned) {
         andConditions.push({
           words: {
-            some: {
-              OR: [
-                {
-                  progress: {
-                    none: {
-                      userId,
-                    },
-                  },
+            some: {},
+            every: {
+              progress: {
+                some: {
+                  userId,
+                  score: { gte: 100 },
                 },
-                {
-                  progress: {
-                    some: {
-                      userId,
-                      score: {
-                        lt: 100,
-                      },
-                    },
-                  },
-                },
-              ],
+              },
             },
           },
         });
       }
 
-      if (isGlobal) {
-        andConditions.push({ isGlobal: true });
+      if (globalOnly) {
+        andConditions.push({
+          isGlobal: true,
+        });
       } else {
         andConditions.push({
           OR: [
             { createdBy: userId },
-            { favoritedByUsers: { some: { id: userId } } },
+            { isGlobal: true },
           ],
         });
       }
@@ -86,10 +70,7 @@ export const groupsRouter = createTRPCRouter({
       let orderBy: Prisma.WordGroupOrderByWithRelationInput[] = [];
       switch (sortBy) {
         case "favorites":
-          orderBy = [
-            { favoritedByUsers: { _count: "desc" } },
-            { name: "asc" },
-          ];
+          orderBy = [{ favoritedByUsers: { _count: "desc" } }, { name: "asc" }];
           break;
         case "newest":
           orderBy = [{ createdAt: "desc" }];
@@ -97,19 +78,11 @@ export const groupsRouter = createTRPCRouter({
         case "recently_learned":
           orderBy = [];
           break;
-        case "global":
-          orderBy = [];
-          break;
-        case "without_learned":
-          orderBy = [
-            { favoritedByUsers: { _count: "desc" } },
-            { createdAt: "desc" },
-          ];
+        default:
           break;
       }
 
-      const requiresDerivedSort =
-        sortBy === "recently_learned" || sortBy === "global";
+      const requiresDerivedSort = sortBy === "recently_learned";
 
       const groups = await db.wordGroup.findMany({
         where: whereClause,
@@ -137,8 +110,6 @@ export const groupsRouter = createTRPCRouter({
         skip: requiresDerivedSort ? undefined : cursor ? cursor : 0,
       });
 
-      
-
       const groupsWithStats = groups.map((group) => {
         const totalWords = group.words.length;
 
@@ -150,17 +121,23 @@ export const groupsRouter = createTRPCRouter({
           };
         });
 
-        const totalProgress = wordsWithUserProgress.reduce((sum: number, w) => sum + w.userScore, 0);
+        const totalProgress = wordsWithUserProgress.reduce(
+          (sum: number, w) => sum + w.userScore,
+          0,
+        );
 
         const averageProgress =
           totalWords > 0 ? Math.round(totalProgress / totalWords) : 0;
 
-        const completedWords = wordsWithUserProgress.filter((w) => w.userScore >= 100).length;
+        const completedWords = wordsWithUserProgress.filter(
+          (w) => w.userScore >= 100,
+        ).length;
 
-        const lastLearnedAt = group.words
-          .map((w) => w.progress[0]?.updatedAt)
-          .filter((d): d is Date => Boolean(d))
-          .sort((a, b) => b.getTime() - a.getTime())[0] || null;
+        const lastLearnedAt =
+          group.words
+            .map((w) => w.progress[0]?.updatedAt)
+            .filter((d): d is Date => Boolean(d))
+            .sort((a, b) => b.getTime() - a.getTime())[0] || null;
 
         return {
           id: group.id,
