@@ -48,12 +48,15 @@ export function SpeechExercise({
   const [speechSupported, setSpeechSupported] = useState(false);
   const [similarity, setSimilarity] = useState(0);
   const [hasInterimResults, setHasInterimResults] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Ref для отслеживания текущего слова и предотвращения race conditions
   const currentWordIdRef = useRef(word.id);
   const isActiveRef = useRef(true);
 
   const targetWord = word.english;
+  const recognitionPromiseRef = useRef<Promise<void> | null>(null);
+  const hasProcessedCurrentSessionRef = useRef(false);
 
   // Функция для безопасной очистки состояния
   const resetState = useCallback(() => {
@@ -66,9 +69,12 @@ export function SpeechExercise({
     setUserTranscript("");
     setSimilarity(0);
     setHasInterimResults(false);
+    setIsProcessing(false);
     setCanStartListening(false);
     setIsListening(false);
     setIsSpeaking(false);
+    recognitionPromiseRef.current = null;
+    hasProcessedCurrentSessionRef.current = false;
   }, []);
 
   // Обновляем ref при смене слова
@@ -132,6 +138,9 @@ export function SpeechExercise({
 
   const processAnswer = useCallback(
     (transcript: string) => {
+      if (hasProcessedCurrentSessionRef.current) {
+        return;
+      }
       // Проверяем что мы все еще на том же слове
       if (
         currentWordIdRef.current !== word.id ||
@@ -149,6 +158,8 @@ export function SpeechExercise({
       setIsCorrect(isAnswerCorrect);
       setIsListening(false);
       setHasInterimResults(false);
+      setIsProcessing(false);
+      hasProcessedCurrentSessionRef.current = true;
 
       onAnswer(word.id, transcript, isAnswerCorrect);
 
@@ -200,62 +211,88 @@ export function SpeechExercise({
     [word.id, word.english, targetWord, hasAnswered, onAnswer],
   );
 
-  const handleStartListening = async () => {
+  const handleToggleListening = async () => {
     if (!speechSupported) {
       toast.error("Speech recognition not supported in your browser");
       return;
     }
 
-    if (!canStartListening || isListening || isSpeaking || hasAnswered) return;
+    if (!canStartListening || isSpeaking || hasAnswered) return;
 
-    try {
-      setIsListening(true);
-      setUserTranscript("");
-      setHasInterimResults(false);
-
-      await startListening(
-        {
-          lang: "en-US",
-          continuous: true,
-          interimResults: true,
-          maxAlternatives: 1,
-        },
-        (result: SpeechRecognitionResult) => {
-          // Проверяем что мы все еще на том же слове перед обработкой результата
-          if (currentWordIdRef.current !== word.id || !isActiveRef.current) {
-            console.log("Ignoring speech result for stale word");
-            return;
-          }
-
-          setUserTranscript(result.transcript);
-          if (result.transcript.trim().length > 0) {
-            setHasInterimResults(true);
-          }
-
-          if (result.isFinal && result.transcript.trim().length > 0) {
-            processAnswer(result.transcript);
-          }
-        },
-      );
-    } catch (error) {
-      console.warn("Speech recognition failed:", error);
-      toast.error("Failed to recognize speech. Try again.");
-      if (currentWordIdRef.current === word.id && isActiveRef.current) {
-        setIsListening(false);
+    if (!isListening) {
+      try {
+        setIsListening(true);
+        setUserTranscript("");
         setHasInterimResults(false);
-      }
-    }
-  };
+        setIsProcessing(false);
+        hasProcessedCurrentSessionRef.current = false;
 
-  const handleStopListening = () => {
-    if (isListening) {
-      if (hasInterimResults) {
-        return;
-      }
+        recognitionPromiseRef.current = startListening(
+          {
+            lang: "en-US",
+            continuous: true,
+            interimResults: true,
+            maxAlternatives: 1,
+          },
+          (result: SpeechRecognitionResult) => {
+            if (currentWordIdRef.current !== word.id || !isActiveRef.current) {
+              console.log("Ignoring speech result for stale word");
+              return;
+            }
 
+            setUserTranscript(result.transcript);
+            if (result.transcript.trim().length > 0) {
+              setHasInterimResults(true);
+            }
+
+            if (
+              result.isFinal &&
+              result.transcript.trim().length > 0 &&
+              !hasProcessedCurrentSessionRef.current
+            ) {
+              processAnswer(result.transcript);
+            }
+          },
+        )
+          .then((result) => {
+            if (
+              currentWordIdRef.current !== word.id ||
+              !isActiveRef.current ||
+              hasProcessedCurrentSessionRef.current
+            ) {
+              return;
+            }
+
+            if (result.transcript.trim().length > 0) {
+              processAnswer(result.transcript);
+            } else {
+              setIsListening(false);
+              setHasInterimResults(false);
+              setIsProcessing(false);
+            }
+          })
+          .catch((error) => {
+            console.warn("Speech recognition failed:", error);
+            toast.error("Failed to recognize speech. Try again.");
+            if (currentWordIdRef.current === word.id && isActiveRef.current) {
+              setIsListening(false);
+              setHasInterimResults(false);
+              setIsProcessing(false);
+            }
+          });
+      } catch (error) {
+        console.warn("Speech recognition failed:", error);
+        toast.error("Failed to recognize speech. Try again.");
+        if (currentWordIdRef.current === word.id && isActiveRef.current) {
+          setIsListening(false);
+          setHasInterimResults(false);
+          setIsProcessing(false);
+        }
+      }
+    } else {
+      setIsProcessing(true);
       stopListening();
       setIsListening(false);
-      setHasInterimResults(false);
     }
   };
 
@@ -336,10 +373,7 @@ export function SpeechExercise({
         <div className="text-center space-y-4">
           <div className="flex justify-center items-center">
             <Button
-              onMouseDown={!isListening ? handleStartListening : undefined}
-              onMouseUp={isListening ? handleStopListening : undefined}
-              onTouchStart={!isListening ? handleStartListening : undefined}
-              onTouchEnd={isListening ? handleStopListening : undefined}
+              onClick={handleToggleListening}
               disabled={
                 !canStartListening || isSpeaking || isLoading || hasAnswered
               }
@@ -364,13 +398,10 @@ export function SpeechExercise({
             {!canStartListening && isSpeaking && "Listen to the description..."}
             {canStartListening &&
               !isListening &&
-              "Hold the microphone button and speak"}
-            {isListening &&
-              !hasInterimResults &&
-              "Speak now... Release the button when finished"}
-            {isListening &&
-              hasInterimResults &&
-              "Processing speech... Please wait"}
+              !isProcessing &&
+              "Tap the microphone and speak"}
+            {isListening && "Listening... Tap again to stop"}
+            {!isListening && isProcessing && "Processing speech... Please wait"}
             {hasAnswered && "Moving to next word..."}
           </div>
         </div>

@@ -25,6 +25,7 @@ interface LetterButton {
   id: string;
   letter: string;
   originalIndex: number;
+  used: boolean;
 }
 
 export function TypingExercise({
@@ -36,7 +37,7 @@ export function TypingExercise({
   const [showRussian, setShowRussian] = useState(false);
   const [availableLetters, setAvailableLetters] = useState<LetterButton[]>([]);
   const [selectedLetters, setSelectedLetters] = useState<LetterButton[]>([]);
-  const [errorLetters, setErrorLetters] = useState<Set<string>>(new Set());
+  const [errorLetters, setErrorLetters] = useState<Set<number>>(new Set());
   const [hasAnswered, setHasAnswered] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -50,6 +51,7 @@ export function TypingExercise({
       id: `${letter}-${index}`,
       letter: letter === " " ? "␣" : letter,
       originalIndex: index,
+      used: false,
     }));
 
     const shuffled = [...letters].sort(() => Math.random() - 0.5);
@@ -78,8 +80,10 @@ export function TypingExercise({
     void autoSpeakDescription();
   }, [word.id, word.english, targetWord]);
 
-  const handleLetterClick = async (clickedLetter: LetterButton) => {
-    if (hasAnswered || errorLetters.has(clickedLetter.id) || isSpeaking) return;
+  const handleLetterClick = async (slotIndex: number) => {
+    if (hasAnswered || isSpeaking) return;
+    const clickedLetter = availableLetters[slotIndex];
+    if (!clickedLetter || clickedLetter.used) return;
 
     const nextExpectedIndex = selectedLetters.length;
     const expectedLetter = targetLetters[nextExpectedIndex];
@@ -89,9 +93,20 @@ export function TypingExercise({
       expectedLetter
     ) {
       setSelectedLetters((prev) => [...prev, clickedLetter]);
-      setAvailableLetters((prev) =>
-        prev.filter((letter) => letter.id !== clickedLetter.id),
-      );
+      setAvailableLetters((prev) => {
+        const next = [...prev];
+        if (slotIndex < 0 || slotIndex >= next.length) return prev;
+        const letterAtSlot = next[slotIndex];
+        if (!letterAtSlot || letterAtSlot.used) return prev;
+        const updatedLetter: LetterButton = {
+          id: letterAtSlot.id,
+          letter: letterAtSlot.letter,
+          originalIndex: letterAtSlot.originalIndex,
+          used: true,
+        };
+        next[slotIndex] = updatedLetter;
+        return next;
+      });
 
       if (selectedLetters.length + 1 === targetLetters.length) {
         const userAnswer = [...selectedLetters, clickedLetter]
@@ -115,13 +130,13 @@ export function TypingExercise({
         }
       }
     } else {
-      setErrorLetters((prev) => new Set(prev).add(clickedLetter.id));
+      setErrorLetters((prev) => new Set(prev).add(slotIndex));
       toast.error("Wrong letter!");
 
       setTimeout(() => {
         setErrorLetters((prev) => {
           const newSet = new Set(prev);
-          newSet.delete(clickedLetter.id);
+          newSet.delete(slotIndex);
           return newSet;
         });
       }, 1000);
@@ -161,6 +176,7 @@ export function TypingExercise({
       id: `${letter}-${index}`,
       letter: letter === " " ? "␣" : letter,
       originalIndex: index,
+      used: false,
     }));
 
     const shuffled = [...letters].sort(() => Math.random() - 0.5);
@@ -240,24 +256,29 @@ export function TypingExercise({
             Available Letters:
           </h3>
           <div className="flex flex-wrap justify-center gap-3 min-h-[80px] p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            {availableLetters.map((letter) => (
-              <Button
-                key={letter.id}
-                onClick={() => handleLetterClick(letter)}
-                disabled={hasAnswered || isLoading || isSpeaking}
-                className={cn(
-                  "w-12 h-12 text-lg font-bold transition-all duration-200",
-                  errorLetters.has(letter.id) &&
-                    "bg-red-500 hover:bg-red-500 animate-pulse",
-                  letter.letter === "␣" &&
-                    "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300",
+            {availableLetters.map((letter, index) => (
+              <div key={`slot-${index}`}>
+                {letter.used ? (
+                  <div className="w-12 h-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg" />
+                ) : (
+                  <Button
+                    onClick={() => handleLetterClick(index)}
+                    disabled={hasAnswered || isLoading || isSpeaking}
+                    className={cn(
+                      "w-12 h-12 text-lg font-bold transition-all duration-200",
+                      errorLetters.has(index) &&
+                        "bg-red-500 hover:bg-red-500 animate-pulse",
+                      letter.letter === "␣" &&
+                        "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300",
+                    )}
+                    variant={
+                      errorLetters.has(index) ? "destructive" : "outline"
+                    }
+                  >
+                    {letter.letter === "␣" ? "␣" : letter.letter.toUpperCase()}
+                  </Button>
                 )}
-                variant={
-                  errorLetters.has(letter.id) ? "destructive" : "outline"
-                }
-              >
-                {letter.letter === "␣" ? "␣" : letter.letter.toUpperCase()}
-              </Button>
+              </div>
             ))}
           </div>
         </div>

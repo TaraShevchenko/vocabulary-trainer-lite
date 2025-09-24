@@ -14,6 +14,7 @@ import { MatchingExercise } from "./MatchingExercise";
 import { MultipleChoiceExercise } from "./MultipleChoiceExercise";
 import { SpeechExercise } from "./SpeechExercise";
 import { TypingExercise } from "./TypingExercise";
+import { IntroExercise } from "./IntroExercise";
 
 interface ExerciseSessionProps {
   groupId: string;
@@ -28,7 +29,7 @@ interface SessionStats {
   bestStreak: number;
 }
 
-type ExerciseType = "matching" | "multiple-choice" | "typing" | "speech";
+type ExerciseType = "intro" | "matching" | "multiple-choice" | "typing" | "speech";
 
 const EXERCISE_ORDER: ExerciseType[] = ["multiple-choice", "speech", "typing"];
 
@@ -36,7 +37,8 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
   const router = useRouter();
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [currentExerciseType, setCurrentExerciseType] =
-    useState<ExerciseType>("matching");
+    useState<ExerciseType>("intro");
+  const [hasCompletedIntro, setHasCompletedIntro] = useState(false);
   const [hasCompletedMatching, setHasCompletedMatching] = useState(false);
   const [sessionStats, setSessionStats] = useState<SessionStats>({
     totalAnswers: 0,
@@ -57,19 +59,23 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
 
   const currentWord = words?.[currentWordIndex];
   const progressPercentage = words
-    ? currentExerciseType === "matching"
-      ? Math.round((sessionStats.correctAnswers / words.length) * 100)
-      : Math.round(((currentWordIndex + 1) / words.length) * 100)
+    ? currentExerciseType === "intro"
+      ? Math.round(((currentWordIndex + 1) / words.length) * 100)
+      : currentExerciseType === "matching"
+        ? Math.round((sessionStats.correctAnswers / words.length) * 100)
+        : Math.round(((currentWordIndex + 1) / words.length) * 100)
     : 0;
   const accuracyPercentage =
     sessionStats.totalAnswers > 0
       ? Math.round(
-          (sessionStats.correctAnswers / sessionStats.totalAnswers) * 100,
-        )
+        (sessionStats.correctAnswers / sessionStats.totalAnswers) * 100,
+      )
       : 0;
 
   const getProgressIncrement = (exerciseType: ExerciseType): number => {
     switch (exerciseType) {
+      case "intro":
+        return 0;
       case "matching":
         return 4;
       case "multiple-choice":
@@ -115,6 +121,13 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
   const handleNext = () => {
     if (!words) return;
 
+    if (currentExerciseType === "intro") {
+      setHasCompletedIntro(true);
+      setCurrentExerciseType("matching");
+      setCurrentWordIndex(0);
+      return;
+    }
+
     if (currentExerciseType === "matching") {
       setHasCompletedMatching(true);
       setCurrentExerciseType("multiple-choice");
@@ -140,9 +153,16 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
     }
   };
 
+  const handleSkipIntro = () => {
+    setHasCompletedIntro(true);
+    setCurrentExerciseType("matching");
+    setCurrentWordIndex(0);
+  };
+
   const handleRestart = () => {
     setCurrentWordIndex(0);
-    setCurrentExerciseType("matching");
+    setCurrentExerciseType("intro");
+    setHasCompletedIntro(false);
     setHasCompletedMatching(false);
     setSessionStats({
       totalAnswers: 0,
@@ -293,9 +313,11 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
           {groupName || "Exercises"}
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
+          {currentExerciseType === "intro" && "Introduction"}
           {currentExerciseType === "matching" && "Matching"}
           {currentExerciseType === "multiple-choice" && "Multiple Choice"}
           {currentExerciseType === "typing" && "Typing"}
+          {currentExerciseType === "speech" && "Speech"}
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-500">
           Word {currentWordIndex + 1} of {words.length}
@@ -327,8 +349,16 @@ export function ExerciseSession({ groupId, groupName }: ExerciseSessionProps) {
         )}
       </div>
 
-      {(currentExerciseType === "matching" || currentWord) && (
+      {(currentExerciseType === "intro" || currentExerciseType === "matching" || currentWord) && (
         <div className="mb-8">
+          {currentExerciseType === "intro" && !hasCompletedIntro && (
+            <IntroExercise
+              words={words}
+              onNext={handleNext}
+              onSkipAll={handleSkipIntro}
+              isLoading={updateProgressMutation.isPending}
+            />
+          )}
           {currentExerciseType === "matching" && !hasCompletedMatching && (
             <MatchingExercise
               words={words}

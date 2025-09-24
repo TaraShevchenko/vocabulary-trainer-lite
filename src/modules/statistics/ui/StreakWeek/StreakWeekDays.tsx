@@ -9,7 +9,7 @@ export function StreakWeekDays(props: { week: WeekDayItem[] }) {
   const { week } = props;
 
   return (
-    <div className="mt-4 grid grid-cols-7 gap-2">
+    <div className="mt-4 grid grid-cols-7 gap-2 max-w-[400px] mx-auto">
       {dayLabels.map((label, i) => {
         const d = week[i];
         const isDone = Boolean(d?.hasActivity);

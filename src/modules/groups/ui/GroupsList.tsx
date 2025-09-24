@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Search, X, Plus } from "lucide-react";
+import { Search, X, Plus, Filter } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "@/shared/api/client";
 import { useDebounce, useInfiniteScroll } from "@/shared/hooks";
 import { Button } from "@/shared/ui/button";
+import { Checkbox } from "@/shared/ui/checkbox";
 import { Input } from "@/shared/ui/input";
+import { Label } from "@/shared/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover";
 import {
   Select,
   SelectContent,
@@ -23,16 +26,12 @@ enum SortOption {
   FAVORITES = "favorites",
   NEWEST = "newest",
   RECENTLY_LEARNED = "recently_learned",
-  WITHOUT_LEARNED = "without_learned",
-  GLOBAL = "global",
 }
 
 const sortLabels = {
-  [SortOption.FAVORITES]: "Favorites",
-  [SortOption.NEWEST]: "Recently added",
   [SortOption.RECENTLY_LEARNED]: "Recently learned",
-  [SortOption.WITHOUT_LEARNED]: "Without learned",
-  [SortOption.GLOBAL]: "Global",
+  [SortOption.NEWEST]: "Recently added",
+  [SortOption.FAVORITES]: "Favorites",
 };
 
 export function GroupsList() {
@@ -40,9 +39,10 @@ export function GroupsList() {
   const [sortOption, setSortOption] = useState<SortOption>(
     SortOption.RECENTLY_LEARNED,
   );
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [globalOnly, setGlobalOnly] = useState(false);
+  const [onlyLearned, setOnlyLearned] = useState(false);
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
-  const isGlobal = sortOption === SortOption.GLOBAL;
-  const hideLearned = sortOption === SortOption.WITHOUT_LEARNED;
 
   const {
     data,
@@ -56,8 +56,8 @@ export function GroupsList() {
       limit: 9,
       search: debouncedSearchQuery || undefined,
       sortBy: sortOption,
-      hideLearned,
-      isGlobal,
+      onlyLearned,
+      globalOnly,
     },
     {
       getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -158,6 +158,32 @@ export function GroupsList() {
               ))}
             </SelectContent>
           </Select>
+
+          <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Filters">
+                <Filter className="size-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56" align="end">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="globalOnly"
+                  checked={globalOnly}
+                  onCheckedChange={(v) => setGlobalOnly(Boolean(v))}
+                />
+                <Label htmlFor="globalOnly">Global</Label>
+              </div>
+              <div className="mt-3 flex items-center space-x-2">
+                <Checkbox
+                  id="onlyLearned"
+                  checked={onlyLearned}
+                  onCheckedChange={(v) => setOnlyLearned(Boolean(v))}
+                />
+                <Label htmlFor="onlyLearned">Already learned</Label>
+              </div>
+            </PopoverContent>
+          </Popover>
 
           <AddGroupModal>
             <Button
