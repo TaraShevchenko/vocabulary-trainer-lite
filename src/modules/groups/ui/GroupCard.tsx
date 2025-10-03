@@ -48,7 +48,7 @@ export function GroupCard({
 
   return (
     <Link
-      href={`/exercises/${id}`}
+      href={`/groups/${id}`}
       className="block transition-transform hover:scale-105"
     >
       <Card className="h-full cursor-pointer hover:shadow-lg transition-shadow">

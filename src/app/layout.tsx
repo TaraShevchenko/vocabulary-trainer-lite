@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import {
@@ -15,8 +14,6 @@ import { TRPCReactProvider } from "@/shared/api/client";
 import { Button } from "@/shared/ui/button";
 import { Skeleton } from "@/shared/ui/skeleton";
 import "./globals.css";
-
-// import { NavigationMenu } from "@/shared/ui/navigation-menu";
 
 export const metadata: Metadata = {
   title: "Vocabulary Trainer Lite",
@@ -53,15 +50,6 @@ export default function RootLayout({
               </Button>
             </SignedOut>
             <SignedIn>
-              {/* <NavigationMenu
-                  items={[
-                    {
-                      title: "Дашборд",
-                      href: "/",
-                    },
-                  ]}
-                /> */}
-
               <UserButton
                 fallback={<Skeleton className="h-7 w-7 rounded-full" />}
               />
