@@ -138,6 +138,21 @@ export function ExploreExercise({
     }
   };
 
+  const handleSpeakDescription = async () => {
+    if (isSpeaking || isListening || !currentWord?.description) return;
+
+    try {
+      setIsSpeaking(true);
+      await speakText(currentWord.description, { lang: "en-US", rate: 0.8 });
+    } catch (error) {
+      console.warn("Description text-to-speech failed:", error);
+    } finally {
+      if (currentWordIdRef.current === currentWord.id && isActiveRef.current) {
+        setIsSpeaking(false);
+      }
+    }
+  };
+
   const processAnswer = useCallback(
     (transcript: string) => {
       if (hasProcessedCurrentSessionRef.current) {
@@ -351,97 +366,107 @@ export function ExploreExercise({
           </div>
         </div>
 
-        <div className="mb-6 relative">
-          <div
-            onClick={() => setShowRussian(!showRussian)}
-            className={cn(
-              "inline-block px-6 py-4 rounded-xl cursor-pointer transition-all duration-300 text-4xl font-bold relative group",
-              showRussian
-                ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800"
-                : "bg-gray-200 dark:bg-gray-700 text-transparent select-none border-2 border-gray-300 dark:border-gray-600",
-              !showRussian && "hover:bg-gray-300 dark:hover:bg-gray-600",
-            )}
-            style={{
-              filter: showRussian ? "none" : "blur(6px)",
-            }}
-          >
-            {currentWord.russian}
-            {!showRussian && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <EyeOff className="h-8 w-8 text-gray-500 dark:text-gray-400" />
-              </div>
-            )}
-          </div>
-          {!showRussian && (
-            <div className="text-center mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Click to reveal translation
-            </div>
-          )}
-        </div>
-
         <CardTitle
           className={cn(
-            "text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
+            "text-5xl font-bold text-gray-900 dark:text-gray-100 mb-6",
             isSpeaking && "text-blue-600 dark:text-blue-400",
           )}
-          onClick={handleSpeakWord}
         >
           {currentWord.english}
         </CardTitle>
+
+        {currentWord.description && (
+          <div
+            className={cn(
+              "text-lg text-gray-700 dark:text-gray-300 mb-6 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
+              isSpeaking && "text-blue-600 dark:text-blue-400",
+            )}
+            onClick={handleSpeakDescription}
+          >
+            {currentWord.description}
+          </div>
+        )}
+
+        <div className="mb-6 relative">
+          <Button
+            onClick={() => setShowRussian(!showRussian)}
+            variant={showRussian ? "default" : "outline"}
+            className={cn(
+              "w-full py-4 text-lg font-medium transition-all duration-300",
+              showRussian
+                ? "bg-blue-500 hover:bg-blue-600 text-white"
+                : "border-2 border-dashed border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400",
+            )}
+          >
+            {showRussian ? (
+              currentWord.russian
+            ) : (
+              <div className="flex items-center justify-center gap-2">
+                <EyeOff className="h-5 w-5" />
+                Click to reveal translation
+              </div>
+            )}
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="text-center space-y-4">
-          <div className="flex justify-center items-center">
-            <Button
-              onClick={handleToggleListening}
-              disabled={
-                !canStartListening || isSpeaking || isLoading || hasAnswered
-              }
-              className={cn(
-                "w-20 h-20 rounded-full text-white transition-all duration-200 select-none",
-                isListening
-                  ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                  : "bg-blue-500 hover:bg-blue-600",
-                (!canStartListening || isSpeaking) && "opacity-50",
-              )}
-              variant={isListening ? "destructive" : "default"}
-            >
-              {isListening ? (
-                <MicOff className="h-8 w-8" />
-              ) : (
-                <Mic className="h-8 w-8" />
-              )}
-            </Button>
-          </div>
+        <div className="flex gap-4 justify-center">
+          <Button
+            onClick={handleToggleListening}
+            disabled={
+              !canStartListening || isSpeaking || isLoading || hasAnswered
+            }
+            className={cn(
+              "flex-1 h-16 rounded-xl text-white transition-all duration-200 select-none flex items-center gap-3",
+              isListening
+                ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                : "bg-blue-500 hover:bg-blue-600",
+              (!canStartListening || isSpeaking) && "opacity-50",
+            )}
+            variant={isListening ? "destructive" : "default"}
+          >
+            {isListening ? (
+              <>
+                <MicOff className="h-6 w-6" />
+                Stop Listening
+              </>
+            ) : (
+              <>
+                <Mic className="h-6 w-6" />
+                Repeat Word
+              </>
+            )}
+          </Button>
 
+          <Button
+            onClick={handleNextWord}
+            disabled={isSpeaking}
+            className="flex-1 h-16 rounded-xl flex items-center gap-3"
+            variant="outline"
+          >
+            <SkipForward className="h-6 w-6" />
+            {isLastWord ? "Start Exercises" : "Next"}
+          </Button>
+        </div>
+
+        <div className="text-center space-y-2">
           <div className="text-sm text-gray-600 dark:text-gray-400">
             {!canStartListening && isSpeaking && "Listen to the word..."}
             {canStartListening &&
               !isListening &&
               !isProcessing &&
-              "Tap the microphone and repeat the word"}
-            {isListening && "Listening... Tap again to stop"}
+              "Click microphone to repeat the word or click Next to continue"}
+            {isListening &&
+              "Listening... Click stop when finished or click Next to skip"}
             {!isListening && isProcessing && "Processing speech... Please wait"}
             {hasAnswered && "Moving to next word..."}
           </div>
-        </div>
 
-        <div className="flex gap-3 justify-center">
-          <Button
-            onClick={handleNextWord}
-            disabled={isSpeaking}
-            className="px-8 flex items-center gap-2"
-            variant="outline"
-          >
-            {isLastWord ? "Start Exercises" : "Next"}
-          </Button>
-        </div>
-
-        <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-          {!showRussian
-            ? "Click on the translation to reveal it"
-            : "Listen to the word and repeat it to continue"}
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            Speak the word correctly to advance automatically, or use Next to
+            continue
+          </div>
         </div>
       </CardContent>
     </Card>
