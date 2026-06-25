@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Target } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Flag, Target } from "lucide-react";
 import { api } from "@/shared/api/client";
 import { VoiceSelector } from "@/shared/ui/VoiceSelector";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { cn } from "@/shared/utils/cn";
 import { ExerciseSelector } from "./ExerciseSelector";
 import { ProgressHeader } from "./ProgressHeader";
 import { SessionComplete } from "./SessionComplete";
@@ -29,6 +31,13 @@ interface SessionStats {
   bestStreak: number;
 }
 
+interface ExerciseStats {
+  totalAnswers: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  completed: boolean;
+}
+
 type ExerciseType =
   | "intro"
   | "matching"
@@ -44,6 +53,44 @@ const EXERCISE_ORDER: ExerciseType[] = [
   "typing",
 ];
 
+const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
+  intro: "Intro",
+  matching: "Matching",
+  "multiple-choice": "Choice",
+  typing: "Typing",
+  speech: "Speech",
+};
+
+const createEmptyExerciseStats = (): ExerciseStats => ({
+  totalAnswers: 0,
+  correctAnswers: 0,
+  incorrectAnswers: 0,
+  completed: false,
+});
+
+const createExerciseStatsMap = (
+  exerciseOrder: ExerciseType[],
+): Record<ExerciseType, ExerciseStats> =>
+  EXERCISE_ORDER.reduce(
+    (acc, exerciseType) => {
+      acc[exerciseType] = {
+        ...createEmptyExerciseStats(),
+        completed: !exerciseOrder.includes(exerciseType),
+      };
+      return acc;
+    },
+    {} as Record<ExerciseType, ExerciseStats>,
+  );
+
+const createWordIndexMap = (initialIndex = 0): Record<ExerciseType, number> =>
+  EXERCISE_ORDER.reduce(
+    (acc, exerciseType) => {
+      acc[exerciseType] = initialIndex;
+      return acc;
+    },
+    {} as Record<ExerciseType, number>,
+  );
+
 export function ExerciseSession({
   groupId,
   groupName,
@@ -52,12 +99,14 @@ export function ExerciseSession({
   exerciseOrder = EXERCISE_ORDER,
 }: ExerciseSessionProps) {
   const router = useRouter();
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const [wordIndexByExercise, setWordIndexByExercise] =
+    useState<Record<ExerciseType, number>>(createWordIndexMap);
   const [currentExerciseType, setCurrentExerciseType] = useState<ExerciseType>(
     (initialExerciseType as ExerciseType) || exerciseOrder[0] || "intro",
   );
-  const [hasCompletedIntro, setHasCompletedIntro] = useState(false);
-  const [hasCompletedMatching, setHasCompletedMatching] = useState(false);
+  const [exerciseStats, setExerciseStats] = useState<
+    Record<ExerciseType, ExerciseStats>
+  >(() => createExerciseStatsMap(exerciseOrder));
   const [sessionStats, setSessionStats] = useState<SessionStats>({
     totalAnswers: 0,
     correctAnswers: 0,
@@ -80,17 +129,31 @@ export function ExerciseSession({
     if (initialWordId && words) {
       const wordIndex = words.findIndex((word) => word.id === initialWordId);
       if (wordIndex !== -1) {
-        setCurrentWordIndex(wordIndex);
+        setWordIndexByExercise(createWordIndexMap(wordIndex));
       }
     }
   }, [initialWordId, words]);
 
+  const currentWordIndex = wordIndexByExercise[currentExerciseType] || 0;
   const currentWord = words?.[currentWordIndex];
+  const currentExerciseStats = exerciseStats[currentExerciseType];
+  const completedExercisesCount = exerciseOrder.filter(
+    (exerciseType) => exerciseStats[exerciseType]?.completed,
+  ).length;
+  const areAllExercisesCompleted =
+    completedExercisesCount === exerciseOrder.length;
   const progressPercentage = words
     ? currentExerciseType === "intro"
-      ? Math.round(((currentWordIndex + 1) / words.length) * 100)
+      ? currentExerciseStats?.completed
+        ? 100
+        : Math.round(((currentWordIndex + 1) / words.length) * 100)
       : currentExerciseType === "matching"
-        ? Math.round((sessionStats.correctAnswers / words.length) * 100)
+        ? currentExerciseStats?.completed
+          ? 100
+          : Math.round(
+              ((currentExerciseStats?.correctAnswers || 0) / words.length) *
+                100,
+            )
         : Math.round(((currentWordIndex + 1) / words.length) * 100)
     : 0;
   const accuracyPercentage =
@@ -134,6 +197,17 @@ export function ExerciseSession({
       };
       return newStats;
     });
+    setExerciseStats((prev) => ({
+      ...prev,
+      [currentExerciseType]: {
+        ...prev[currentExerciseType],
+        totalAnswers: prev[currentExerciseType].totalAnswers + 1,
+        correctAnswers:
+          prev[currentExerciseType].correctAnswers + (isCorrect ? 1 : 0),
+        incorrectAnswers:
+          prev[currentExerciseType].incorrectAnswers + (isCorrect ? 0 : 1),
+      },
+    }));
 
     try {
       await updateProgressMutation.mutateAsync({
@@ -146,77 +220,83 @@ export function ExerciseSession({
     }
   };
 
+  const getNextAvailableExercise = (exerciseType: ExerciseType) => {
+    const currentExerciseIndex = exerciseOrder.indexOf(exerciseType);
+    const nextInOrder = exerciseOrder
+      .slice(currentExerciseIndex + 1)
+      .find((nextExerciseType) => !exerciseStats[nextExerciseType]?.completed);
+
+    return (
+      nextInOrder ||
+      exerciseOrder.find(
+        (nextExerciseType) =>
+          nextExerciseType !== exerciseType &&
+          !exerciseStats[nextExerciseType]?.completed,
+      )
+    );
+  };
+
+  const markExerciseCompleted = (exerciseType: ExerciseType) => {
+    setExerciseStats((prev) => ({
+      ...prev,
+      [exerciseType]: {
+        ...prev[exerciseType],
+        completed: true,
+      },
+    }));
+  };
+
+  const moveToNextExercise = (exerciseType: ExerciseType) => {
+    const nextExerciseType = getNextAvailableExercise(exerciseType);
+    if (nextExerciseType) {
+      setCurrentExerciseType(nextExerciseType);
+      return;
+    }
+
+    setIsSessionComplete(true);
+  };
+
   const handleNext = () => {
     if (!words) return;
 
-    // Если изучаем конкретное слово, переходим к следующему упражнению для того же слова
     if (initialWordId) {
-      const currentExerciseIndex = exerciseOrder.indexOf(currentExerciseType);
-      if (currentExerciseIndex < exerciseOrder.length - 1) {
-        const nextExerciseType = exerciseOrder[currentExerciseIndex + 1];
-        if (nextExerciseType) {
-          setCurrentExerciseType(nextExerciseType);
-          return;
-        }
+      markExerciseCompleted(currentExerciseType);
+      const nextExerciseType = getNextAvailableExercise(currentExerciseType);
+      if (nextExerciseType) {
+        setCurrentExerciseType(nextExerciseType);
       } else {
-        // Все упражнения для слова завершены, возвращаемся к группе
         router.push(`/groups/${groupId}`);
-        return;
       }
+      return;
     }
 
-    if (currentExerciseType === "intro") {
-      setHasCompletedIntro(true);
-      const nextExerciseIndex = exerciseOrder.indexOf("intro") + 1;
-      if (nextExerciseIndex < exerciseOrder.length) {
-        setCurrentExerciseType(exerciseOrder[nextExerciseIndex]!);
-        setCurrentWordIndex(0);
-        return;
-      }
-    }
-
-    if (currentExerciseType === "matching") {
-      setHasCompletedMatching(true);
-      const nextExerciseIndex = exerciseOrder.indexOf("matching") + 1;
-      if (nextExerciseIndex < exerciseOrder.length) {
-        setCurrentExerciseType(exerciseOrder[nextExerciseIndex]!);
-        setCurrentWordIndex(0);
-        return;
-      }
+    if (currentExerciseType === "intro" || currentExerciseType === "matching") {
+      markExerciseCompleted(currentExerciseType);
+      moveToNextExercise(currentExerciseType);
+      return;
     }
 
     if (currentWordIndex < words.length - 1) {
-      setCurrentWordIndex((prev) => prev + 1);
+      setWordIndexByExercise((prev) => ({
+        ...prev,
+        [currentExerciseType]: currentWordIndex + 1,
+      }));
     } else {
-      const currentExerciseIndex = exerciseOrder.indexOf(currentExerciseType);
-      if (currentExerciseIndex < exerciseOrder.length - 1) {
-        const nextExerciseType = exerciseOrder[currentExerciseIndex + 1];
-        if (nextExerciseType) {
-          setCurrentExerciseType(nextExerciseType);
-          setCurrentWordIndex(0);
-        } else {
-          setIsSessionComplete(true);
-        }
-      } else {
-        setIsSessionComplete(true);
-      }
+      markExerciseCompleted(currentExerciseType);
+      moveToNextExercise(currentExerciseType);
     }
   };
 
-  const handleSkipIntro = () => {
-    setHasCompletedIntro(true);
-    const nextExerciseIndex = exerciseOrder.indexOf("intro") + 1;
-    if (nextExerciseIndex < exerciseOrder.length) {
-      setCurrentExerciseType(exerciseOrder[nextExerciseIndex]!);
+  const handleExerciseTabChange = (exerciseType: string) => {
+    if (exerciseOrder.includes(exerciseType as ExerciseType)) {
+      setCurrentExerciseType(exerciseType as ExerciseType);
     }
-    setCurrentWordIndex(0);
   };
 
   const handleRestart = () => {
-    setCurrentWordIndex(0);
+    setWordIndexByExercise(createWordIndexMap());
     setCurrentExerciseType(exerciseOrder[0] || "intro");
-    setHasCompletedIntro(false);
-    setHasCompletedMatching(false);
+    setExerciseStats(createExerciseStatsMap(exerciseOrder));
     setSessionStats({
       totalAnswers: 0,
       correctAnswers: 0,
@@ -225,6 +305,10 @@ export function ExerciseSession({
       bestStreak: 0,
     });
     setIsSessionComplete(false);
+  };
+
+  const handleFinishTest = () => {
+    setIsSessionComplete(true);
   };
 
   const handleBackToDashboard = () => {
@@ -321,6 +405,50 @@ export function ExerciseSession({
         progressPercentage={progressPercentage}
       />
 
+      <Tabs
+        value={currentExerciseType}
+        onValueChange={handleExerciseTabChange}
+        className="mb-5 items-center"
+      >
+        <TabsList className="flex h-auto w-full max-w-3xl flex-wrap justify-center gap-1 rounded-xl p-1">
+          {exerciseOrder.map((exerciseType) => {
+            const isCompleted = exerciseStats[exerciseType]?.completed;
+
+            return (
+              <TabsTrigger
+                key={exerciseType}
+                value={exerciseType}
+                className={cn(
+                  "min-h-10 flex-none px-3",
+                  isCompleted &&
+                    "border-green-200 bg-green-50 text-green-700 data-[state=active]:bg-green-100 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300 dark:data-[state=active]:bg-green-900/40",
+                )}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <Circle className="h-4 w-4" />
+                )}
+                {EXERCISE_TYPE_LABELS[exerciseType]}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
+
+      {currentExerciseStats?.completed && (
+        <div className="mx-auto mb-6 max-w-xl rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-green-900 shadow-sm dark:border-green-800 dark:bg-green-950/30 dark:text-green-100">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-sm">
+            <span className="flex items-center gap-2 font-medium">
+              <CheckCircle2 className="h-4 w-4" />
+              {EXERCISE_TYPE_LABELS[currentExerciseType]} completed
+            </span>
+            <span>Correct: {currentExerciseStats.correctAnswers}</span>
+            <span>Errors: {currentExerciseStats.incorrectAnswers}</span>
+          </div>
+        </div>
+      )}
+
       <SessionStats
         correctAnswers={sessionStats.correctAnswers}
         incorrectAnswers={sessionStats.incorrectAnswers}
@@ -332,14 +460,24 @@ export function ExerciseSession({
           exerciseType={currentExerciseType}
           currentWord={currentWord}
           words={words}
-          hasCompletedIntro={hasCompletedIntro}
-          hasCompletedMatching={hasCompletedMatching}
           onAnswer={handleAnswer}
           onNext={handleNext}
-          onSkipIntro={handleSkipIntro}
           isLoading={updateProgressMutation.isPending}
           exerciseOrder={exerciseOrder}
         />
+      </div>
+
+      <div className="mx-auto flex max-w-3xl flex-col items-center justify-between gap-3 rounded-xl border bg-background p-4 shadow-sm sm:flex-row">
+        <div className="text-center text-sm text-gray-600 dark:text-gray-400 sm:text-left">
+          {completedExercisesCount} of {exerciseOrder.length} exercises
+          completed
+          {!areAllExercisesCompleted &&
+            " - you can finish now or come back to any tab"}
+        </div>
+        <Button onClick={handleFinishTest} className="w-full sm:w-auto">
+          <Flag className="h-4 w-4 mr-2" />
+          Finish test
+        </Button>
       </div>
     </div>
   );

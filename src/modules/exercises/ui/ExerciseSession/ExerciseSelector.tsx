@@ -28,15 +28,12 @@ interface ExerciseSelectorProps {
   exerciseType: ExerciseType;
   currentWord?: Word;
   words: Word[];
-  hasCompletedIntro: boolean;
-  hasCompletedMatching: boolean;
   onAnswer: (
     wordId: string,
     userAnswer: string,
     isCorrect: boolean,
   ) => Promise<void>;
   onNext: () => void;
-  onSkipIntro: () => void;
   isLoading: boolean;
   exerciseOrder?: ExerciseType[];
 }
@@ -45,11 +42,8 @@ export function ExerciseSelector({
   exerciseType,
   currentWord,
   words,
-  hasCompletedIntro,
-  hasCompletedMatching,
   onAnswer,
   onNext,
-  onSkipIntro,
   isLoading,
   exerciseOrder,
 }: ExerciseSelectorProps) {
@@ -65,23 +59,12 @@ export function ExerciseSelector({
 
   switch (exerciseType) {
     case "intro":
-      if (!hasCompletedIntro) {
-        return (
-          <ExploreExercise
-            words={words}
-            onNext={onNext}
-            onSkipAll={onSkipIntro}
-            isLoading={isLoading}
-          />
-        );
-      }
-      return null;
+      return (
+        <ExploreExercise words={words} onNext={onNext} isLoading={isLoading} />
+      );
 
     case "matching":
-      if (!hasCompletedMatching) {
-        return <MatchingExercise words={words} {...exerciseProps} />;
-      }
-      return null;
+      return <MatchingExercise words={words} {...exerciseProps} />;
 
     case "multiple-choice":
       if (currentWord) {

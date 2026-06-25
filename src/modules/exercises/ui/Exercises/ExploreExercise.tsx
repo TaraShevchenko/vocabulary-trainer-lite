@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { EyeOff, Mic, MicOff, SkipForward } from "lucide-react";
+import { ArrowRight, EyeOff, Mic, MicOff } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -28,14 +28,12 @@ interface ExploreExerciseProps {
     progress: number;
   }>;
   onNext: () => void;
-  onSkipAll: () => void;
   isLoading?: boolean;
 }
 
 export function ExploreExercise({
   words,
   onNext,
-  onSkipAll,
   isLoading = false,
 }: ExploreExerciseProps) {
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
@@ -319,10 +317,6 @@ export function ExploreExercise({
     }
   };
 
-  const handleSkipAll = () => {
-    onSkipAll();
-  };
-
   useEffect(() => {
     return () => {
       isActiveRef.current = false;
@@ -343,7 +337,7 @@ export function ExploreExercise({
             or Safari.
           </p>
           <Button onClick={onNext} variant="outline">
-            Skip exercise
+            Continue
           </Button>
         </CardContent>
       </Card>
@@ -445,8 +439,8 @@ export function ExploreExercise({
             className="flex-1 h-16 rounded-xl flex items-center gap-3"
             variant="outline"
           >
-            <SkipForward className="h-6 w-6" />
-            {isLastWord ? "Start Exercises" : "Next"}
+            <ArrowRight className="h-6 w-6" />
+            {isLastWord ? "Finish intro" : "Next"}
           </Button>
         </div>
 
@@ -456,9 +450,9 @@ export function ExploreExercise({
             {canStartListening &&
               !isListening &&
               !isProcessing &&
-              "Click microphone to repeat the word or click Next to continue"}
+              "Click microphone to repeat the word or continue when ready"}
             {isListening &&
-              "Listening... Click stop when finished or click Next to skip"}
+              "Listening... Click stop when finished or continue when ready"}
             {!isListening && isProcessing && "Processing speech... Please wait"}
             {hasAnswered && "Moving to next word..."}
           </div>

@@ -323,7 +323,7 @@ export function SpeechExercise({
             or Safari.
           </p>
           <Button onClick={onNext} variant="outline">
-            Skip exercise
+            Continue
           </Button>
         </CardContent>
       </Card>
