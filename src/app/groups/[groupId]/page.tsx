@@ -54,29 +54,29 @@ export default function GroupViewPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+        <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words text-3xl font-bold text-gray-900 dark:text-gray-100">
               {group.name}
             </h1>
             {group.description && (
-              <p className="text-lg text-gray-600 dark:text-gray-400 mt-2">
+              <p className="mt-2 break-words text-lg text-gray-600 dark:text-gray-400">
                 {group.description}
               </p>
             )}
           </div>
-          <div className="flex gap-3">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <Button
               variant="outline"
               onClick={() => router.push(`/exercises/${groupId}/explore`)}
-              className="flex items-center gap-2"
+              className="flex w-full items-center gap-2 sm:w-auto"
             >
               <Eye className="h-4 w-4" />
               Explore
             </Button>
             <Button
               onClick={() => router.push(`/exercises/${groupId}/learn`)}
-              className="flex items-center gap-2"
+              className="flex w-full items-center gap-2 sm:w-auto"
             >
               <Play className="h-4 w-4" />
               Learn
