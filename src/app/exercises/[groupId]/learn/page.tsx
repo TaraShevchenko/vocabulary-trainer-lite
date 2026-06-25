@@ -36,7 +36,7 @@ export default async function LearnPage({
     <ExerciseSession
       groupId={groupId}
       initialWordId={wordId}
-      exerciseOrder={["matching", "multiple-choice", "speech", "typing"]}
+      exerciseOrder={["multiple-choice", "matching", "speech", "typing"]}
     />
   );
 }

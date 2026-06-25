@@ -2,13 +2,26 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle, Flag, Target } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  CheckCircle2,
+  Circle,
+  Flag,
+  Keyboard,
+  Link2,
+  ListChecks,
+  Mic,
+  Target,
+  type LucideIcon,
+} from "lucide-react";
 import { api } from "@/shared/api/client";
 import { VoiceSelector } from "@/shared/ui/VoiceSelector";
 import { Alert, AlertDescription } from "@/shared/ui/alert";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip";
 import { cn } from "@/shared/utils/cn";
 import { ExerciseSelector } from "./ExerciseSelector";
 import { ProgressHeader } from "./ProgressHeader";
@@ -47,8 +60,8 @@ type ExerciseType =
 
 const EXERCISE_ORDER: ExerciseType[] = [
   "intro",
-  "matching",
   "multiple-choice",
+  "matching",
   "speech",
   "typing",
 ];
@@ -59,6 +72,14 @@ const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
   "multiple-choice": "Choice",
   typing: "Typing",
   speech: "Speech",
+};
+
+const EXERCISE_TYPE_ICONS: Record<ExerciseType, LucideIcon> = {
+  intro: BookOpen,
+  matching: Link2,
+  "multiple-choice": ListChecks,
+  typing: Keyboard,
+  speech: Mic,
 };
 
 const createEmptyExerciseStats = (): ExerciseStats => ({
@@ -410,27 +431,38 @@ export function ExerciseSession({
         onValueChange={handleExerciseTabChange}
         className="mb-5 items-center"
       >
-        <TabsList className="flex h-auto w-full max-w-3xl flex-wrap justify-center gap-1 rounded-xl p-1">
+        <TabsList className="flex h-auto max-w-full flex-nowrap justify-center gap-1 rounded-xl p-1">
           {exerciseOrder.map((exerciseType) => {
             const isCompleted = exerciseStats[exerciseType]?.completed;
+            const ExerciseIcon = EXERCISE_TYPE_ICONS[exerciseType];
 
             return (
-              <TabsTrigger
-                key={exerciseType}
-                value={exerciseType}
-                className={cn(
-                  "min-h-10 flex-none px-3",
-                  isCompleted &&
-                    "border-green-200 bg-green-50 text-green-700 data-[state=active]:bg-green-100 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300 dark:data-[state=active]:bg-green-900/40",
-                )}
-              >
-                {isCompleted ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <Circle className="h-4 w-4" />
-                )}
-                {EXERCISE_TYPE_LABELS[exerciseType]}
-              </TabsTrigger>
+              <Tooltip key={exerciseType}>
+                <TooltipTrigger asChild>
+                  <TabsTrigger
+                    value={exerciseType}
+                    aria-label={EXERCISE_TYPE_LABELS[exerciseType]}
+                    className={cn(
+                      "relative h-10 w-11 flex-none px-0",
+                      isCompleted &&
+                        "border-green-200 bg-green-50 text-green-700 data-[state=active]:bg-green-100 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300 dark:data-[state=active]:bg-green-900/40",
+                    )}
+                  >
+                    <ExerciseIcon className="h-5 w-5" />
+                    {isCompleted ? (
+                      <CheckCircle2 className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-background text-green-600" />
+                    ) : (
+                      <Circle className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-background text-muted-foreground" />
+                    )}
+                    <span className="sr-only">
+                      {EXERCISE_TYPE_LABELS[exerciseType]}
+                    </span>
+                  </TabsTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {EXERCISE_TYPE_LABELS[exerciseType]}
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </TabsList>
