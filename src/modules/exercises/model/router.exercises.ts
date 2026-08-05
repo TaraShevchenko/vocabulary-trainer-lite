@@ -43,6 +43,7 @@ export const exercisesRouter = createTRPCRouter({
           english: word.english,
           russian: word.russian,
           description: word.description,
+          exampleSentence: word.exampleSentence,
           progress: userProgress?.score || 0,
           lastStudied: userProgress?.updatedAt || word.createdAt,
           // Добавляем случайное число для перемешивания среди одинаковых прогрессов

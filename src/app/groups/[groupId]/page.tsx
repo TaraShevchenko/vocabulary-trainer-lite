@@ -152,6 +152,7 @@ export default function GroupViewPage() {
                   <TableHead>Английский</TableHead>
                   <TableHead>Русский</TableHead>
                   <TableHead>Описание</TableHead>
+                  <TableHead>Предложение</TableHead>
                   <TableHead>Прогресс</TableHead>
                 </TableRow>
               </TableHeader>
@@ -164,6 +165,9 @@ export default function GroupViewPage() {
                     <TableCell>{word.russian}</TableCell>
                     <TableCell className="max-w-xs truncate">
                       {word.description || "-"}
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate">
+                      {word.exampleSentence || "-"}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

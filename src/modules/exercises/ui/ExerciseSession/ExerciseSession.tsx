@@ -13,6 +13,7 @@ import {
   ListChecks,
   Mic,
   Target,
+  TextCursorInput,
   type LucideIcon,
 } from "lucide-react";
 import { api } from "@/shared/api/client";
@@ -54,6 +55,7 @@ interface ExerciseStats {
 type ExerciseType =
   | "intro"
   | "matching"
+  | "sentence-completion"
   | "multiple-choice"
   | "typing"
   | "speech";
@@ -62,6 +64,7 @@ const EXERCISE_ORDER: ExerciseType[] = [
   "intro",
   "multiple-choice",
   "matching",
+  "sentence-completion",
   "speech",
   "typing",
 ];
@@ -69,6 +72,7 @@ const EXERCISE_ORDER: ExerciseType[] = [
 const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
   intro: "Intro",
   matching: "Matching",
+  "sentence-completion": "Fill sentences",
   "multiple-choice": "Choice",
   typing: "Typing",
   speech: "Speech",
@@ -77,6 +81,7 @@ const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
 const EXERCISE_TYPE_ICONS: Record<ExerciseType, LucideIcon> = {
   intro: BookOpen,
   matching: Link2,
+  "sentence-completion": TextCursorInput,
   "multiple-choice": ListChecks,
   typing: Keyboard,
   speech: Mic,
@@ -168,11 +173,18 @@ export function ExerciseSession({
       ? currentExerciseStats?.completed
         ? 100
         : Math.round(((currentWordIndex + 1) / words.length) * 100)
-      : currentExerciseType === "matching"
+      : currentExerciseType === "matching" ||
+          currentExerciseType === "sentence-completion"
         ? currentExerciseStats?.completed
           ? 100
           : Math.round(
-              ((currentExerciseStats?.correctAnswers || 0) / words.length) *
+              ((currentExerciseStats?.correctAnswers || 0) /
+                Math.max(
+                  1,
+                  currentExerciseType === "sentence-completion"
+                    ? words.filter((word) => word.exampleSentence).length
+                    : words.length,
+                )) *
                 100,
             )
         : Math.round(((currentWordIndex + 1) / words.length) * 100)
@@ -190,6 +202,8 @@ export function ExerciseSession({
         return 0;
       case "matching":
         return 4;
+      case "sentence-completion":
+        return 8;
       case "multiple-choice":
         return 6;
       case "typing":
@@ -291,7 +305,11 @@ export function ExerciseSession({
       return;
     }
 
-    if (currentExerciseType === "intro" || currentExerciseType === "matching") {
+    if (
+      currentExerciseType === "intro" ||
+      currentExerciseType === "matching" ||
+      currentExerciseType === "sentence-completion"
+    ) {
       markExerciseCompleted(currentExerciseType);
       moveToNextExercise(currentExerciseType);
       return;

@@ -6,6 +6,8 @@ export const env = createEnv({
     DATABASE_URL: z.string().url(),
     CLERK_SECRET_KEY: z.string(),
     CLERK_WEBHOOK_SECRET: z.string().optional(),
+    OPENAI_API_KEY: z.string().optional(),
+    OPENAI_MODEL: z.string().default("gpt-5.6-luna"),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -24,6 +26,8 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
     CLERK_WEBHOOK_SECRET: process.env.CLERK_WEBHOOK_SECRET,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    OPENAI_MODEL: process.env.OPENAI_MODEL,
     NODE_ENV: process.env.NODE_ENV,
     // Client-side variables
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:

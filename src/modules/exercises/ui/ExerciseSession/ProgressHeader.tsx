@@ -5,6 +5,7 @@ import { Progress } from "@/shared/ui/progress";
 type ExerciseType =
   | "intro"
   | "matching"
+  | "sentence-completion"
   | "multiple-choice"
   | "typing"
   | "speech";
@@ -20,6 +21,7 @@ interface ProgressHeaderProps {
 const EXERCISE_TYPE_LABELS: Record<ExerciseType, string> = {
   intro: "Introduction",
   matching: "Matching",
+  "sentence-completion": "Fill in the Sentences",
   "multiple-choice": "Multiple Choice",
   typing: "Typing",
   speech: "Speech",

@@ -4,6 +4,7 @@ import {
   ExploreExercise,
   MatchingExercise,
   MultipleChoiceExercise,
+  SentenceCompletionExercise,
   SpeechExercise,
   TypingExercise,
 } from "../Exercises";
@@ -11,6 +12,7 @@ import {
 type ExerciseType =
   | "intro"
   | "matching"
+  | "sentence-completion"
   | "multiple-choice"
   | "typing"
   | "speech";
@@ -20,6 +22,7 @@ interface Word {
   english: string;
   russian: string;
   description: string;
+  exampleSentence: string | null;
   progress: number;
   lastStudied: Date;
 }
@@ -65,6 +68,9 @@ export function ExerciseSelector({
 
     case "matching":
       return <MatchingExercise words={words} {...exerciseProps} />;
+
+    case "sentence-completion":
+      return <SentenceCompletionExercise words={words} {...exerciseProps} />;
 
     case "multiple-choice":
       if (currentWord) {

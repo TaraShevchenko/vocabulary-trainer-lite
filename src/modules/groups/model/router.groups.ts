@@ -56,10 +56,7 @@ export const groupsRouter = createTRPCRouter({
         });
       } else {
         andConditions.push({
-          OR: [
-            { createdBy: userId },
-            { isGlobal: true },
-          ],
+          OR: [{ createdBy: userId }, { isGlobal: true }],
         });
       }
 
@@ -416,6 +413,7 @@ export const groupsRouter = createTRPCRouter({
               english: z.string().min(1, "English word is required"),
               russian: z.string().min(1, "Russian translation is required"),
               description: z.string().optional().default(""),
+              exampleSentence: z.string().max(1000).optional().default(""),
             }),
           )
           .min(1, "Add at least one word"),
@@ -447,6 +445,7 @@ export const groupsRouter = createTRPCRouter({
               english: word.english,
               russian: word.russian,
               description: word.description || "",
+              exampleSentence: word.exampleSentence?.trim() || null,
             })),
           },
         },
